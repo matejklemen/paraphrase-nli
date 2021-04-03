@@ -57,7 +57,7 @@ class SNLITransformersDataset(TransformersSeqPairDataset):
             optional_kwargs["truncation"] = "longest_first"
 
         encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
-        encoded["label"] = valid_label
+        encoded["labels"] = valid_label
 
         super().__init__(**encoded)
 
@@ -95,7 +95,7 @@ class MultiNLITransformersDataset(TransformersSeqPairDataset):
             optional_kwargs["truncation"] = "longest_first"
 
         encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
-        encoded["label"] = valid_label
+        encoded["labels"] = valid_label
 
         super().__init__(**encoded)
 
@@ -130,7 +130,7 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
             optional_kwargs["truncation"] = "longest_first"
 
         encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
-        encoded["label"] = valid_label
+        encoded["labels"] = valid_label
 
         super().__init__(**encoded)
 
