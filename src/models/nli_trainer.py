@@ -7,19 +7,18 @@ from typing import Optional
 import torch
 import torch.optim as optim
 from torch.utils.data import Subset, DataLoader
+from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification
 
-MODELS_SAVE_DIR = "models"
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 logging.info(f"Using device {DEVICE}")
 
 
 class TransformersNLITrainer:
-    def __init__(self, model_name, pretrained_model_name_or_path, num_labels, pred_strategy="argmax", thresh=None,
+    def __init__(self, model_dir, pretrained_model_name_or_path, num_labels, pred_strategy="argmax", thresh=None,
                  batch_size=24, learning_rate=6.25e-5, validate_every_n_steps=5_000, early_stopping_tol=5,
                  use_mcd: Optional[bool] = False, optimized_metric="accuracy", device="cuda"):
-        self.model_name = model_name
-        self.model_save_path = os.path.join(MODELS_SAVE_DIR, self.model_name)
+        self.model_save_path = model_dir
 
         self.pretrained_model_name_or_path = pretrained_model_name_or_path
         self.batch_size = batch_size
@@ -69,8 +68,8 @@ class TransformersNLITrainer:
         if not os.path.exists(os.path.join(save_dir, "trainer_config.json")):
             with open(os.path.join(save_dir, "trainer_config.json"), "w", encoding="utf-8") as f:
                 json.dump({
-                    "model_name": self.model_name,
-                    "pretrained_model_name_or_path": self.pretrained_model_name_or_path,
+                    "model_dir": save_dir,
+                    "pretrained_model_name_or_path": save_dir,
                     "num_labels": self.num_labels,
                     "pred_strategy": self.pred_strategy,
                     "thresh": self.thresh,
@@ -84,10 +83,20 @@ class TransformersNLITrainer:
 
         self.model.save_pretrained(save_dir)
 
+    @staticmethod
+    def from_pretrained(model_dir):
+        with open(os.path.join(model_dir, "trainer_config.json"), "r", encoding="utf-8") as f:
+            pretrained_config = json.load(f)
+
+        instance = TransformersNLITrainer(**pretrained_config)
+        return instance
+
     def train(self, train_dataset):
         self.model.train()
+        num_batches = (len(train_dataset) + self.batch_size - 1) // self.batch_size
         train_loss = 0.0
-        for curr_batch in DataLoader(train_dataset, shuffle=False, batch_size=self.batch_size):
+        for curr_batch in tqdm(DataLoader(train_dataset, shuffle=False, batch_size=self.batch_size),
+                               total=num_batches):
             res = self.model(**{k: v.to(self.device) for k, v in curr_batch.items()})
 
             res["loss"].backward()
@@ -96,7 +105,7 @@ class TransformersNLITrainer:
 
             train_loss += float(res["loss"])
 
-        return {"train_loss": train_loss}
+        return {"train_loss": train_loss / max(num_batches, 1)}
 
     @torch.no_grad()
     def evaluate(self, val_dataset):
@@ -104,13 +113,16 @@ class TransformersNLITrainer:
             self.model.train()
         else:
             self.model.eval()
-        eval_loss, num_batches = 0.0, 0
+
+        num_batches = (len(val_dataset) + self.batch_size - 1) // self.batch_size
+        eval_loss = 0.0
 
         results = {
             "pred_label": [],
             "pred_proba": []
         }
-        for curr_batch in DataLoader(val_dataset, shuffle=False, batch_size=self.batch_size):
+        for curr_batch in tqdm(DataLoader(val_dataset, shuffle=False, batch_size=self.batch_size),
+                               total=num_batches):
             res = self.model(**curr_batch)
             eval_loss += float(res["loss"])
             num_batches += 1
