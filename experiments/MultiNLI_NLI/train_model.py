@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 
 import pandas as pd
 import torch
-from transformers import BertTokenizerFast, RobertaTokenizerFast
+from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast
 
 from src.data.nli import MultiNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
@@ -57,15 +57,17 @@ if __name__ == "__main__":
         tokenizer_cls = BertTokenizerFast
     elif args.model_type == "roberta":
         tokenizer_cls = RobertaTokenizerFast
+    elif args.model_type == "xlm-roberta":
+        tokenizer_cls = XLMRobertaTokenizerFast
     else:
         raise NotImplementedError("Model_type '{args.model_type}' is not supported")
 
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
-    train_set = MultiNLITransformersDataset("train[:100]", tokenizer=tokenizer,
+    train_set = MultiNLITransformersDataset("train", tokenizer=tokenizer,
                                             max_length=args.max_seq_len, return_tensors="pt")
-    dev_set = MultiNLITransformersDataset("validation_matched[:100]" if args.mode == "matched" else "validation_mismatched",
+    dev_set = MultiNLITransformersDataset("validation_matched" if args.mode == "matched" else "validation_mismatched",
                                           tokenizer=tokenizer,
                                           max_length=args.max_seq_len, return_tensors="pt")
 
@@ -75,7 +77,7 @@ if __name__ == "__main__":
         test_set = MultiNLITransformersDataset("validation_matched[:5]", tokenizer=tokenizer,
                                                max_length=args.max_seq_len, return_tensors="pt")
 
-        df = pd.read_csv(args.test_path, sep="\t").iloc[:30]
+        df = pd.read_csv(args.test_path, sep="\t")
         encoded = tokenizer.batch_encode_plus(list(zip(df["sentence1"].tolist(), df["sentence2"].tolist())),
                                               max_length=args.max_seq_len, padding="max_length",
                                               truncation="longest_first", return_tensors="pt")
