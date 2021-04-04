@@ -170,7 +170,7 @@ class TransformersNLITrainer:
                     is_better = val_loss < best_metric
                     val_metric = val_loss
                 else:
-                    val_acc = float(torch.sum(torch.eq(val_res["pred_label"], val_dataset.labels)) / len(val_dataset))
+                    val_acc = float(torch.sum(torch.eq(val_res["pred_label"], val_dataset.labels))) / len(val_dataset)
                     logging.info(f"Validation accuracy: {val_acc: .4f}")
                     is_better = val_acc > best_metric
                     val_metric = val_acc

@@ -102,7 +102,7 @@ if __name__ == "__main__":
         trainer = TransformersNLITrainer.from_pretrained(args.experiment_dir)
         test_res = trainer.evaluate(test_set)
         if hasattr(test_set, "labels"):
-            test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], test_set.labels)) / len(test_set))
+            test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], test_set.labels))) / len(test_set)
             logging.info(f"Test accuracy: {test_accuracy: .4f}")
         else:
             logging.info(f"Skipping test set evaluation because no labels were found!")
