@@ -105,7 +105,7 @@ class TransformersNLITrainer:
 
             train_loss += float(res["loss"])
 
-        return {"train_loss": train_loss / max(num_batches, 1)}
+        return {"train_loss": train_loss}
 
     @torch.no_grad()
     def evaluate(self, val_dataset):
@@ -146,6 +146,7 @@ class TransformersNLITrainer:
         for idx_epoch in range(num_epochs):
             logging.info(f"Epoch {1+idx_epoch}/{num_epochs}")
             shuffled_indices = torch.randperm(len(train_dataset))
+            train_loss, nb = 0.0, 0
 
             num_minisets = (len(train_dataset) + self.validate_every_n_steps - 1) // self.validate_every_n_steps
             for idx_miniset in range(num_minisets):
@@ -154,8 +155,9 @@ class TransformersNLITrainer:
                                                                      (idx_miniset + 1) * self.validate_every_n_steps])
                 num_subset_batches = (len(curr_subset) + self.batch_size - 1) // self.batch_size
                 train_res = self.train(curr_subset)
-                train_loss = train_res["train_loss"] / num_subset_batches
-                logging.info(f"Training loss = {train_loss: .4f}")
+                train_loss += train_res["train_loss"]
+                nb += num_subset_batches
+                logging.info(f"Training loss = {train_loss / nb: .4f}")
 
                 if val_dataset is None or len(curr_subset) < self.validate_every_n_steps // 2:
                     logging.info(f"Skipping validation after training on a small training subset "
