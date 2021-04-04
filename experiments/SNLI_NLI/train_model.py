@@ -5,8 +5,7 @@ import sys
 from argparse import ArgumentParser
 
 import torch
-from transformers import BertTokenizerFast, RobertaTokenizerFast, OpenAIGPTTokenizerFast, \
-    XLMRobertaTokenizerFast, XLNetTokenizerFast
+from transformers import BertTokenizerFast, RobertaTokenizerFast
 
 from src.data.nli import SNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
@@ -15,7 +14,7 @@ parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
 parser.add_argument("--model_type", type=str, default="bert",
-                    choices=["bert", "roberta", "gpt1", "gpt2", "xlnet", "xlm-roberta"])
+                    choices=["bert", "roberta"])
 
 parser.add_argument("--combine_train_dev", action="store_true")
 
@@ -55,14 +54,6 @@ if __name__ == "__main__":
         tokenizer_cls = BertTokenizerFast
     elif args.model_type == "roberta":
         tokenizer_cls = RobertaTokenizerFast
-    elif args.model_type == "gpt1":
-        tokenizer_cls = OpenAIGPTTokenizerFast
-    elif args.model_type == "gpt2":
-        tokenizer_cls = OpenAIGPTTokenizerFast
-    elif args.model_type == "xlnet":
-        tokenizer_cls = XLNetTokenizerFast
-    elif args.model_type == "xlm-roberta":
-        tokenizer_cls = XLMRobertaTokenizerFast
     else:
         raise NotImplementedError("Model_type '{args.model_type}' is not supported")
 
