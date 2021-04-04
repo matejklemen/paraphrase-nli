@@ -1,4 +1,5 @@
-from typing import Optional
+import itertools
+from typing import Optional, List, Union, Iterable
 
 import datasets
 import torch
@@ -8,7 +9,9 @@ from torch.utils.data import Dataset
 This file contains NLI-related dataset constructors.
 
 TODO: ESNLI? -> explanations are paraphrases by design
+TODO: ANLI?
 TODO: FEVER?
+TODO: custom loader for XNLI -> to load translations, which are not available in Huggingface?
 """
 
 
@@ -29,18 +32,25 @@ class TransformersSeqPairDataset(Dataset):
 
 
 class SNLITransformersDataset(TransformersSeqPairDataset):
-    def __init__(self, split: str, tokenizer, max_length: Optional[int] = None, return_tensors: Optional[str] = None):
-        dataset = datasets.load_dataset("snli", split=split)
-        all_hypothesis = dataset["hypothesis"]
-        all_premise = dataset["premise"]
-        all_label = dataset["label"]
+    def __init__(self, split: Union[str, Iterable[str]], tokenizer, max_length: Optional[int] = None, return_tensors: Optional[str] = None,
+                 custom_label_names: Optional[List[str]] = None):
+        _split = (split,) if isinstance(split, str) else split
 
-        self.label_names = dataset.features["label"].names
+        datasets_list = [datasets.load_dataset("snli", split=curr_split) for curr_split in _split]
+        all_hypothesis = list(itertools.chain(*[curr_dataset["hypothesis"] for curr_dataset in datasets_list]))
+        all_premise = list(itertools.chain(*[curr_dataset["premise"] for curr_dataset in datasets_list]))
+        all_label = list(itertools.chain(*[curr_dataset["label"] for curr_dataset in datasets_list]))
+
+        if custom_label_names is None:
+            self.label_names = datasets_list[0].features["label"].names
+        else:
+            self.label_names = custom_label_names
+
         self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
         self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
 
         # Examples that have a valid label (!= -1)
-        valid_indices = [_i for _i in range(len(dataset)) if all_label[_i] != -1]
+        valid_indices = [_i for _i in range(len(all_label)) if all_label[_i] != -1]
 
         self.str_premise = [all_premise[_i] for _i in valid_indices]
         self.str_hypothesis = [all_hypothesis[_i] for _i in valid_indices]
@@ -63,20 +73,28 @@ class SNLITransformersDataset(TransformersSeqPairDataset):
 
 
 class MultiNLITransformersDataset(TransformersSeqPairDataset):
-    def __init__(self, split: str, tokenizer, max_length: Optional[int] = None, return_tensors: Optional[str] = None):
-        dataset = datasets.load_dataset("multi_nli", split=split)
-        all_pair_ids = dataset["pairID"]
-        all_genres = dataset["genre"]
-        all_hypothesis = dataset["hypothesis"]
-        all_premise = dataset["premise"]
-        all_label = dataset["label"]
+    def __init__(self, split: Union[str, Iterable[str]], tokenizer,
+                 max_length: Optional[int] = None, return_tensors: Optional[str] = None,
+                 custom_label_names: Optional[List[str]] = None):
+        _split = (split,) if isinstance(split, str) else split
 
-        self.label_names = dataset.features["label"].names
+        datasets_list = [datasets.load_dataset("multi_nli", split=curr_split) for curr_split in _split]
+        all_pair_ids = list(itertools.chain(*[curr_dataset["pairID"] for curr_dataset in datasets_list]))
+        all_genres = list(itertools.chain(*[curr_dataset["genre"] for curr_dataset in datasets_list]))
+        all_hypothesis = list(itertools.chain(*[curr_dataset["hypothesis"] for curr_dataset in datasets_list]))
+        all_premise = list(itertools.chain(*[curr_dataset["premise"] for curr_dataset in datasets_list]))
+        all_label = list(itertools.chain(*[curr_dataset["label"] for curr_dataset in datasets_list]))
+
+        if custom_label_names is None:
+            self.label_names = datasets_list[0].features["label"].names
+        else:
+            self.label_names = custom_label_names
+
         self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
         self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
 
         # Examples that have a valid label (!= -1)
-        valid_indices = [_i for _i in range(len(dataset)) if all_label[_i] != -1]
+        valid_indices = [_i for _i in range(len(all_label)) if all_label[_i] != -1]
 
         self.pair_ids = [all_pair_ids[_i] for _i in valid_indices]
         self.str_premise = [all_premise[_i] for _i in valid_indices]
@@ -101,19 +119,28 @@ class MultiNLITransformersDataset(TransformersSeqPairDataset):
 
 
 class XNLITransformersDataset(TransformersSeqPairDataset):
-    def __init__(self, lang: str, split: str, tokenizer,
-                 max_length: Optional[int] = None, return_tensors: Optional[str] = None):
-        dataset = datasets.load_dataset("xnli", lang, split=split)
-        all_hypothesis = dataset["hypothesis"]
-        all_premise = dataset["premise"]
-        all_label = dataset["label"]
+    def __init__(self, lang: Union[str, Iterable[str]], split: Union[str, Iterable[str]], tokenizer,
+                 max_length: Optional[int] = None, return_tensors: Optional[str] = None,
+                 custom_label_names: Optional[List[str]] = None):
+        _lang = (lang,) if isinstance(lang, str) else lang
+        _split = (split,) if isinstance(split, str) else split
 
-        self.label_names = dataset.features["label"].names
+        datasets_list = [datasets.load_dataset("xnli", curr_lang, split=curr_split)
+                         for curr_lang, curr_split in zip(_lang, _split)]
+        all_hypothesis = list(itertools.chain(*[curr_dataset["hypothesis"] for curr_dataset in datasets_list]))
+        all_premise = list(itertools.chain(*[curr_dataset["premise"] for curr_dataset in datasets_list]))
+        all_label = list(itertools.chain(*[curr_dataset["label"] for curr_dataset in datasets_list]))
+
+        if custom_label_names is None:
+            self.label_names = datasets_list[0].features["label"].names
+        else:
+            self.label_names = custom_label_names
+
         self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
         self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
 
         # Examples that have a valid label (!= -1)
-        valid_indices = [_i for _i in range(len(dataset)) if all_label[_i] != -1]
+        valid_indices = [_i for _i in range(len(all_label)) if all_label[_i] != -1]
 
         self.str_premise = [all_premise[_i] for _i in valid_indices]
         self.str_hypothesis = [all_hypothesis[_i] for _i in valid_indices]
@@ -138,6 +165,6 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
 if __name__ == "__main__":
     from transformers import BertTokenizerFast, RobertaTokenizerFast
     tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-    dataset = XNLITransformersDataset("de", split="test", tokenizer=tokenizer)
+    dataset = MultiNLITransformersDataset(("validation_matched", "validation_mismatched"), tokenizer=tokenizer)
 
     print(len(dataset))
