@@ -123,15 +123,15 @@ class TransformersNLITrainer:
         }
         for curr_batch in tqdm(DataLoader(val_dataset, shuffle=False, batch_size=self.batch_size),
                                total=num_batches):
-            res = self.model(**curr_batch)
+            res = self.model(**{k: v.to(self.device) for k, v in curr_batch.items()})
             eval_loss += float(res["loss"])
             num_batches += 1
 
             probas = torch.softmax(res["logits"], dim=-1)
             preds = self.predict_label(logits=res["logits"])
 
-            results["pred_label"].append(preds)
-            results["pred_proba"].append(probas)
+            results["pred_label"].append(preds.cpu())
+            results["pred_proba"].append(probas.cpu())
 
         results["pred_label"] = torch.cat(results["pred_label"])
         results["pred_proba"] = torch.cat(results["pred_proba"])
