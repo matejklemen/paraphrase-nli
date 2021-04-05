@@ -174,7 +174,7 @@ class RTETransformersDataset(TransformersSeqPairDataset):
         self.str_premise = df["premise"].tolist()
         self.str_hypothesis = df["hypothesis"].tolist()
 
-        valid_label = df["idx"].tolist()
+        valid_label = list(map(lambda lbl: self.label2idx[lbl], df["label"].tolist()))
 
         optional_kwargs = {}
         if return_tensors is not None:
