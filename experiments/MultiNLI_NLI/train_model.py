@@ -78,6 +78,9 @@ if __name__ == "__main__":
                                                max_length=args.max_seq_len, return_tensors="pt")
 
         df = pd.read_csv(args.test_path, sep="\t")
+        # Some values in mismatched test set are NA, set them to some dummy string so submission file has correct rows
+        df.loc[df["sentence2"].isna(), "sentence2"] = "Dummy"
+
         encoded = tokenizer.batch_encode_plus(list(zip(df["sentence1"].tolist(), df["sentence2"].tolist())),
                                               max_length=args.max_seq_len, padding="max_length",
                                               truncation="longest_first", return_tensors="pt")
