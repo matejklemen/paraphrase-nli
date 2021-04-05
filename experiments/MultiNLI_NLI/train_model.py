@@ -15,7 +15,7 @@ parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
 parser.add_argument("--model_type", type=str, default="bert",
-                    choices=["bert", "roberta"])
+                    choices=["bert", "roberta", "xlm-roberta"])
 
 parser.add_argument("--test_path", type=str,
                     default="/home/matej/Documents/data/multinli/multinli_0.9_test_matched_unlabeled.txt")
