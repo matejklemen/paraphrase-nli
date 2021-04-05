@@ -76,7 +76,7 @@ if __name__ == "__main__":
     # Override parts with custom (translated) data
     if args.custom_train_path is not None:
         logging.info(f"Loading custom training set from '{args.custom_train_path}'")
-        df = pd.read_csv(args.custom_train_path, sep="\t")
+        df = pd.read_csv(args.custom_train_path, sep="\t", quoting=csv.QUOTE_NONE)
         df["label"] = df["label"].apply(lambda lbl: "contradiction" if lbl.lower() == "contradictory" else lbl)
         uniq_labels = set(df["label"])
         assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
