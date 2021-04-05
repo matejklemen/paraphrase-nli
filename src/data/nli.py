@@ -162,11 +162,13 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
 
 
 class RTETransformersDataset(TransformersSeqPairDataset):
-    def __init__(self, path: str, tokenizer, max_length: Optional[int] = None, return_tensors: Optional[str] = None):
-        df = pd.read_csv(path)
+    def __init__(self, path: Union[str, Iterable[str]], tokenizer,
+                 max_length: Optional[int] = None, return_tensors: Optional[str] = None):
+        _path = (path,) if isinstance(path, str) else path
+        df = pd.concat([pd.read_csv(curr_path) for curr_path in _path]).reset_index(drop=True)
 
-        label_names = ["not_entailment", "entailment"]
-        self.label2idx = {curr_label: i for i, curr_label in enumerate(label_names)}
+        self.label_names = ["not_entailment", "entailment"]
+        self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
         self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
 
         self.str_premise = df["premise"].tolist()
