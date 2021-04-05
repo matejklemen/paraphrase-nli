@@ -1,5 +1,6 @@
 import itertools
 from typing import Optional, List, Union, Iterable
+from warnings import warn
 
 import datasets
 import torch
@@ -174,7 +175,11 @@ class RTETransformersDataset(TransformersSeqPairDataset):
         self.str_premise = df["premise"].tolist()
         self.str_hypothesis = df["hypothesis"].tolist()
 
-        valid_label = list(map(lambda lbl: self.label2idx[lbl], df["label"].tolist()))
+        if "label" in df.columns:
+            valid_label = list(map(lambda lbl: self.label2idx[lbl], df["label"].tolist()))
+        else:
+            warn(f"No labels present in file - setting all labels to 0, so you should ignore metrics based on these")
+            valid_label = [0] * len(self.str_premise)
 
         optional_kwargs = {}
         if return_tensors is not None:
