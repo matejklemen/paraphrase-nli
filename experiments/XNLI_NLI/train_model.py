@@ -71,7 +71,7 @@ if __name__ == "__main__":
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
-    train_set = XNLITransformersDataset(args.lang, "train", tokenizer=tokenizer,
+    train_set = XNLITransformersDataset("en", "train", tokenizer=tokenizer,
                                         max_length=args.max_seq_len, return_tensors="pt")
 
     # Override parts with custom (translated) data
