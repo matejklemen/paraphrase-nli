@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 
 import pandas as pd
 import torch
-from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast
+from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, CamembertTokenizerFast
 
 from src.data.nli import XNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
@@ -17,7 +17,7 @@ parser.add_argument("--lang", type=str, default="de")
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
 parser.add_argument("--model_type", type=str, default="bert",
-                    choices=["bert", "roberta", "xlm-roberta"])
+                    choices=["bert", "camembert", "roberta", "xlm-roberta"])
 
 parser.add_argument("--custom_train_path", type=str, default=None,
                     help="If set to a path, will load MNLI train set from this path instead of from 'datasets' library")
@@ -61,6 +61,8 @@ if __name__ == "__main__":
     # No AutoTokenizerFast at the moment?
     if args.model_type == "bert":
         tokenizer_cls = BertTokenizerFast
+    elif args.model_type == "camembert":
+        tokenizer_cls = CamembertTokenizerFast
     elif args.model_type == "roberta":
         tokenizer_cls = RobertaTokenizerFast
     elif args.model_type == "xlm-roberta":
