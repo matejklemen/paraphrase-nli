@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 
 import pandas as pd
 import torch
+import numpy as np
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, CamembertTokenizerFast
 
 from src.data.nli import XNLITransformersDataset
@@ -80,6 +81,11 @@ if __name__ == "__main__":
     if args.custom_train_path is not None:
         logging.info(f"Loading custom training set from '{args.custom_train_path}'")
         df = pd.read_csv(args.custom_train_path, sep="\t", quoting=csv.QUOTE_NONE)
+
+        is_na = np.logical_or(df["premise"].isna(), df["hypo"].isna())
+        logging.info(f"Removing {np.sum(is_na)} sequence pairs due to missing either premise or hypothesis")
+        df = df.loc[np.logical_not(is_na)]
+
         df["label"] = df["label"].apply(lambda lbl: "contradiction" if lbl.lower() == "contradictory" else lbl)
         uniq_labels = set(df["label"])
         assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
