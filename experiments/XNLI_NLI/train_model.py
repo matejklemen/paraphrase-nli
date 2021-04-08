@@ -8,7 +8,8 @@ from argparse import ArgumentParser
 import pandas as pd
 import torch
 import numpy as np
-from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, CamembertTokenizerFast
+from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, CamembertTokenizerFast, \
+    AutoTokenizer
 
 from src.data.nli import XNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
@@ -18,7 +19,7 @@ parser.add_argument("--lang", type=str, default="de")
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
 parser.add_argument("--model_type", type=str, default="bert",
-                    choices=["bert", "camembert", "roberta", "xlm-roberta"])
+                    choices=["bert", "camembert", "roberta", "xlm-roberta", "phobert"])
 
 parser.add_argument("--custom_train_path", type=str, default=None,
                     help="If set to a path, will load MNLI train set from this path instead of from 'datasets' library")
@@ -69,7 +70,7 @@ if __name__ == "__main__":
     elif args.model_type == "xlm-roberta":
         tokenizer_cls = XLMRobertaTokenizerFast
     else:
-        raise NotImplementedError("Model_type '{args.model_type}' is not supported")
+        tokenizer_cls = AutoTokenizer
 
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
