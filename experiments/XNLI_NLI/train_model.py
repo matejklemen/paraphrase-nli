@@ -198,7 +198,7 @@ if __name__ == "__main__":
         if args.en_validation or args.bilingual_validation:
             dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
                                               max_length=args.max_seq_len, return_tensors="pt")
-            dev_res = trainer.evaluate(test_set)
+            dev_res = trainer.evaluate(dev_set)
             dev_accuracy = float(torch.sum(torch.eq(dev_res["pred_label"], dev_set.labels))) / len(dev_set)
             logging.info(f"Dev accuracy ('{args.lang}' only): {dev_accuracy: .4f}")
 
