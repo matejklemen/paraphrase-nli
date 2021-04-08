@@ -45,6 +45,7 @@ parser.add_argument("--use_cpu", action="store_true")
 
 
 if __name__ == "__main__":
+    ALL_LANGS = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
     args = parser.parse_args()
     if not os.path.exists(args.experiment_dir):
         os.makedirs(args.experiment_dir)
@@ -80,33 +81,37 @@ if __name__ == "__main__":
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
-    train_set = XNLITransformersDataset("en", "train", tokenizer=tokenizer,
-                                        max_length=args.max_seq_len, return_tensors="pt")
+    if args.lang == "all_languages":
+        train_set = XNLITransformersDataset(ALL_LANGS, ["train"] * len(ALL_LANGS), tokenizer=tokenizer,
+                                            max_length=args.max_seq_len, return_tensors="pt")
+    else:
+        train_set = XNLITransformersDataset("en", "train", tokenizer=tokenizer,
+                                            max_length=args.max_seq_len, return_tensors="pt")
 
-    # Override parts with custom (translated) data
-    if args.custom_train_path is not None:
-        logging.info(f"Loading custom training set from '{args.custom_train_path}'")
-        df = pd.read_csv(args.custom_train_path, sep="\t", quoting=csv.QUOTE_NONE)
+        # Override parts with custom (translated) data
+        if args.custom_train_path is not None:
+            logging.info(f"Loading custom training set from '{args.custom_train_path}'")
+            df = pd.read_csv(args.custom_train_path, sep="\t", quoting=csv.QUOTE_NONE)
 
-        is_na = np.logical_or(df["premise"].isna(), df["hypo"].isna())
-        logging.info(f"Removing {np.sum(is_na)} sequence pairs due to missing either premise or hypothesis")
-        df = df.loc[np.logical_not(is_na)]
+            is_na = np.logical_or(df["premise"].isna(), df["hypo"].isna())
+            logging.info(f"Removing {np.sum(is_na)} sequence pairs due to missing either premise or hypothesis")
+            df = df.loc[np.logical_not(is_na)]
 
-        df["label"] = df["label"].apply(lambda lbl: "contradiction" if lbl.lower() == "contradictory" else lbl)
-        uniq_labels = set(df["label"])
-        assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
-            f"Non-standard labels: {uniq_labels}"
+            df["label"] = df["label"].apply(lambda lbl: "contradiction" if lbl.lower() == "contradictory" else lbl)
+            uniq_labels = set(df["label"])
+            assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
+                f"Non-standard labels: {uniq_labels}"
 
-        encoded = tokenizer.batch_encode_plus(list(zip(df["premise"].tolist(), df["hypo"].tolist())),
-                                              max_length=args.max_seq_len, padding="max_length",
-                                              truncation="longest_first", return_tensors="pt")
-        train_set.str_premise = df["premise"].tolist()
-        train_set.str_hypothesis = df["hypo"].tolist()
-        train_set.labels = torch.tensor(list(map(lambda lbl: train_set.label2idx[lbl], df["label"].tolist())))
-        for k, v in encoded.items():
-            setattr(train_set, k, v)
+            encoded = tokenizer.batch_encode_plus(list(zip(df["premise"].tolist(), df["hypo"].tolist())),
+                                                  max_length=args.max_seq_len, padding="max_length",
+                                                  truncation="longest_first", return_tensors="pt")
+            train_set.str_premise = df["premise"].tolist()
+            train_set.str_hypothesis = df["hypo"].tolist()
+            train_set.labels = torch.tensor(list(map(lambda lbl: train_set.label2idx[lbl], df["label"].tolist())))
+            for k, v in encoded.items():
+                setattr(train_set, k, v)
 
-        train_set.num_examples = len(train_set.str_premise)
+            train_set.num_examples = len(train_set.str_premise)
 
     if args.en_validation:
         dev_set = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
@@ -115,28 +120,34 @@ if __name__ == "__main__":
         dev_set = XNLITransformersDataset(("en", args.lang), ("validation", "validation"), tokenizer=tokenizer,
                                           max_length=args.max_seq_len, return_tensors="pt")
     else:
-        dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
-        # Override parts with custom (translated) data
-        if args.custom_dev_path is not None:
-            logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
-            df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
-            uniq_labels = set(df_dev["gold_label"])
-            assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
-                f"Non-standard labels: {uniq_labels}"
+        if args.lang == "all_languages":
+            dev_set = XNLITransformersDataset(ALL_LANGS, ["validation"] * len(ALL_LANGS), tokenizer=tokenizer,
+                                              max_length=args.max_seq_len, return_tensors="pt")
+        else:
+            dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
+                                              max_length=args.max_seq_len, return_tensors="pt")
+            # Override parts with custom (translated) data
+            if args.custom_dev_path is not None:
+                logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
+                df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
+                uniq_labels = set(df_dev["gold_label"])
+                assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
+                    f"Non-standard labels: {uniq_labels}"
 
-            encoded = tokenizer.batch_encode_plus(list(zip(df_dev["sentence1"].tolist(), df_dev["sentence2"].tolist())),
-                                                  max_length=args.max_seq_len, padding="max_length",
-                                                  truncation="longest_first", return_tensors="pt")
-            dev_set.str_premise = df_dev["sentence1"].tolist()
-            dev_set.str_hypothesis = df_dev["sentence2"].tolist()
-            dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
-            for k, v in encoded.items():
-                setattr(dev_set, k, v)
+                encoded = tokenizer.batch_encode_plus(list(zip(df_dev["sentence1"].tolist(), df_dev["sentence2"].tolist())),
+                                                      max_length=args.max_seq_len, padding="max_length",
+                                                      truncation="longest_first", return_tensors="pt")
+                dev_set.str_premise = df_dev["sentence1"].tolist()
+                dev_set.str_hypothesis = df_dev["sentence2"].tolist()
+                dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
+                for k, v in encoded.items():
+                    setattr(dev_set, k, v)
 
-            dev_set.num_examples = len(dev_set.str_premise)
+                dev_set.num_examples = len(dev_set.str_premise)
 
-    test_set = XNLITransformersDataset(args.lang, "test", tokenizer=tokenizer,
+    # If evaluating on all languages, we do this in a different way, reloading all languages later on
+    loaded_test_lang = args.lang if args.lang != "all_languages" else "en"
+    test_set = XNLITransformersDataset(loaded_test_lang, "test", tokenizer=tokenizer,
                                        max_length=args.max_seq_len, return_tensors="pt")
     # Override parts with custom (translated) data
     if args.custom_test_path is not None:
@@ -173,6 +184,9 @@ if __name__ == "__main__":
             setattr(train_set, k, merged)
 
         train_set.num_examples = train_set.num_examples + dev_set.num_examples
+        if args.lang == "all_languages":
+            test_set = XNLITransformersDataset(ALL_LANGS, ["test"] * len(ALL_LANGS), tokenizer=tokenizer,
+                                               max_length=args.max_seq_len, return_tensors="pt")
 
         dev_set = test_set
         test_set = None
@@ -202,9 +216,19 @@ if __name__ == "__main__":
             dev_accuracy = float(torch.sum(torch.eq(dev_res["pred_label"], dev_set.labels))) / len(dev_set)
             logging.info(f"Dev accuracy ('{args.lang}' only): {dev_accuracy: .4f}")
 
-        test_res = trainer.evaluate(test_set)
-        if hasattr(test_set, "labels"):
-            test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], test_set.labels))) / len(test_set)
-            logging.info(f"Test accuracy: {test_accuracy: .4f}")
-        else:
-            logging.info(f"Skipping test set evaluation because no labels were found!")
+        all_test_sets = [(args.lang, test_set)]
+        if args.lang == "all_languages":
+            all_test_sets = []
+            for curr_lang in ALL_LANGS:
+                all_test_sets.append((curr_lang, XNLITransformersDataset(curr_lang, "test",
+                                                                         tokenizer=tokenizer,
+                                                                         max_length=args.max_seq_len,
+                                                                         return_tensors="pt")))
+        for curr_lang, curr_test_set in all_test_sets:
+            logging.info(f"Language '{curr_lang}':")
+            test_res = trainer.evaluate(curr_test_set)
+            if hasattr(curr_test_set, "labels"):
+                test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], curr_test_set.labels))) / len(curr_test_set)
+                logging.info(f"Test accuracy: {test_accuracy: .4f}")
+            else:
+                logging.info(f"Skipping test set evaluation because no labels were found!")
