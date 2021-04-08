@@ -16,6 +16,11 @@ from src.models.nli_trainer import TransformersNLITrainer
 
 parser = ArgumentParser()
 parser.add_argument("--lang", type=str, default="de")
+parser.add_argument("--en_validation", action="store_true",
+                    help="Use English instead of target (--lang) validation set")
+parser.add_argument("--bilingual_validation", action="store_true",
+                    help="Use combined English and target (--lang) validation set")
+
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
 parser.add_argument("--model_type", type=str, default="bert",
@@ -103,26 +108,33 @@ if __name__ == "__main__":
 
         train_set.num_examples = len(train_set.str_premise)
 
-    dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
-                                      max_length=args.max_seq_len, return_tensors="pt")
-    # Override parts with custom (translated) data
-    if args.custom_dev_path is not None:
-        logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
-        df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
-        uniq_labels = set(df_dev["gold_label"])
-        assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
-            f"Non-standard labels: {uniq_labels}"
+    if args.en_validation:
+        dev_set = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
+    elif args.bilingual_validation:
+        dev_set = XNLITransformersDataset(("en", args.lang), ("validation", "validation"), tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
+    else:
+        dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
+        # Override parts with custom (translated) data
+        if args.custom_dev_path is not None:
+            logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
+            df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
+            uniq_labels = set(df_dev["gold_label"])
+            assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
+                f"Non-standard labels: {uniq_labels}"
 
-        encoded = tokenizer.batch_encode_plus(list(zip(df_dev["sentence1"].tolist(), df_dev["sentence2"].tolist())),
-                                              max_length=args.max_seq_len, padding="max_length",
-                                              truncation="longest_first", return_tensors="pt")
-        dev_set.str_premise = df_dev["sentence1"].tolist()
-        dev_set.str_hypothesis = df_dev["sentence2"].tolist()
-        dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
-        for k, v in encoded.items():
-            setattr(dev_set, k, v)
+            encoded = tokenizer.batch_encode_plus(list(zip(df_dev["sentence1"].tolist(), df_dev["sentence2"].tolist())),
+                                                  max_length=args.max_seq_len, padding="max_length",
+                                                  truncation="longest_first", return_tensors="pt")
+            dev_set.str_premise = df_dev["sentence1"].tolist()
+            dev_set.str_hypothesis = df_dev["sentence2"].tolist()
+            dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
+            for k, v in encoded.items():
+                setattr(dev_set, k, v)
 
-        dev_set.num_examples = len(dev_set.str_premise)
+            dev_set.num_examples = len(dev_set.str_premise)
 
     test_set = XNLITransformersDataset(args.lang, "test", tokenizer=tokenizer,
                                        max_length=args.max_seq_len, return_tensors="pt")
