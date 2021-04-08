@@ -194,6 +194,14 @@ if __name__ == "__main__":
 
     if test_set is not None:
         trainer = TransformersNLITrainer.from_pretrained(args.experiment_dir)
+        # If using English-only or bilingual dev set, obtain a score on monolingual dev set to aid comparison
+        if args.en_validation or args.bilingual_validation:
+            dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
+                                              max_length=args.max_seq_len, return_tensors="pt")
+            dev_res = trainer.evaluate(test_set)
+            dev_accuracy = float(torch.sum(torch.eq(dev_res["pred_label"], dev_set.labels))) / len(dev_set)
+            logging.info(f"Dev accuracy ('{args.lang}' only): {dev_accuracy: .4f}")
+
         test_res = trainer.evaluate(test_set)
         if hasattr(test_set, "labels"):
             test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], test_set.labels))) / len(test_set)
