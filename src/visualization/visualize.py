@@ -182,14 +182,14 @@ def multicolumn_visualization(column_values: List[List[str]],
                     fmt_metrics.append(f"<div class='col'><strong>{metric_name}</strong></div>")
                 fmt_metrics.append(f"<div class='w-100'></div>")
                 for metric_value in curr_row_data[idx_col]:
-                    fmt_metrics.append(f"<div class='col''>{metric_value}</div>")
+                    fmt_metrics.append(f"<div class='col''>{round(metric_value, 4) if isinstance(metric_value, float) else metric_value}</div>")
 
                 fmt_metrics = "<div class='row local-metrics'>{}</div>".format("\n".join(fmt_metrics))
 
             curr_fmt.append("<div class='col'>{}{}</div>".format(fmt_text, "".join(fmt_metrics)))
 
         formatted_rows.append(
-            "<div class='row example' onclick='toggleLocalMetrics(this)'>{}</div>".format("\n".join(curr_fmt)))
+            "<div class='row example'>{}</div>".format("\n".join(curr_fmt)))
     formatted_rows = "\n".join(formatted_rows)
 
     result_html = \
