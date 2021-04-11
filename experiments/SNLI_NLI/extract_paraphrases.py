@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from argparse import ArgumentParser
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -157,6 +158,7 @@ if __name__ == "__main__":
         "sequence2": []
     }
 
+    t1 = time()
     for dataset_name in ["train", "validation", "test"]:
         dataset = SNLITransformersDataset(dataset_name, tokenizer=tokenizer,
                                           max_length=args.max_seq_len, return_tensors="pt")
@@ -266,6 +268,10 @@ if __name__ == "__main__":
 
         all_paras["sequence1"].extend(paras["sequence1"])
         all_paras["sequence2"].extend(paras["sequence2"])
+
+    t2 = time()
+    logging.info(f"Extraction took {t2 - t1: .4f}s")
+    model_metrics["time_taken"] = round(t2 - t1, 4)
 
     with open(os.path.join(args.experiment_dir, "metrics.json"), "w") as f_metrics:
         logging.info(model_metrics)
