@@ -5,6 +5,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from time import time
+from warnings import warn
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -115,6 +116,8 @@ if __name__ == "__main__":
 
     test_set = SNLITransformersDataset("test", tokenizer=tokenizer,
                                        max_length=args.max_seq_len, return_tensors="pt")
+    warn("Non-binary evaluation metrics (e.g. macro_precision) are calculated using a fixed strategy (argmax), "
+         "while binary ones take into account the optional strategy")
     test_res = get_predictions(model, test_set,
                                pred_strategy="argmax",
                                thresh=args.l2r_thresh,
@@ -125,6 +128,9 @@ if __name__ == "__main__":
 
     bin_labels = (np_labels == test_set.label2idx["entailment"]).astype(np.int32)
     bin_pred = (np_pred == test_set.label2idx["entailment"]).astype(np.int32)
+    if args.r2l_strategy == "thresh":
+        assert args.r2l_thresh is not None
+        bin_pred = (test_res["mean_proba"][:, test_set.label2idx["entailment"]] > args.r2l_thresh).numpy().astype(np.int32)
 
     confusion_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
     plt.matshow(confusion_matrix, cmap="Blues")
