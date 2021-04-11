@@ -33,8 +33,8 @@ parser.add_argument("--r2l_strategy", choices=["argmax", "thresh"], default="arg
 parser.add_argument("--l2r_thresh", type=float, default=None, help="Optional (used if l2r_strategy is 'thresh')")
 parser.add_argument("--r2l_thresh", type=float, default=None, help="Optional (used if r2l_strategy is 'thresh')")
 
-parser.add_argument("--l2r_mcd_rounds", default=0)
-parser.add_argument("--r2l_mcd_rounds", default=0)
+parser.add_argument("--l2r_mcd_rounds", type=int, default=0)
+parser.add_argument("--r2l_mcd_rounds", type=int, default=0)
 
 parser.add_argument("--use_cpu", action="store_true")
 
