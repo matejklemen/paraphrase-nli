@@ -212,7 +212,7 @@ if __name__ == "__main__":
         else:
             logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
-        ent_inds = torch.flatten(torch.nonzero(ent_mask)).tolist()
+        ent_inds = torch.flatten(torch.nonzero(ent_mask, as_tuple=False)).tolist()
 
         # Reverse the order
         new_prem = [dataset.str_hypothesis[_i] for _i in ent_inds]
@@ -247,7 +247,7 @@ if __name__ == "__main__":
         r2l_preds["sd_proba"] = reverse_res["sd_proba"][:, dataset.label2idx["entailment"]].tolist()
 
         rev_ent_mask = reverse_res["pred_label"] == dataset.label2idx["entailment"]  # type: torch.tensor
-        rev_ent_inds = torch.flatten(torch.nonzero(rev_ent_mask)).tolist()
+        rev_ent_inds = torch.flatten(torch.nonzero(rev_ent_mask, as_tuple=False)).tolist()
 
         logging.info(f"Writing right-to-left prediction information to file ({len(dataset)} rows)")
         pd.DataFrame(r2l_preds).to_csv(os.path.join(r2l_dir, f"{dataset_name}_preds.csv"),
