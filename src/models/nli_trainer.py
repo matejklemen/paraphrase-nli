@@ -3,15 +3,13 @@ import logging
 import os
 from time import time
 from typing import Optional
+from warnings import warn
 
 import torch
 import torch.optim as optim
 from torch.utils.data import Subset, DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification
-
-DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-logging.info(f"Using device {DEVICE}")
 
 
 class TransformersNLITrainer:
@@ -69,9 +67,10 @@ class TransformersNLITrainer:
             with open(os.path.join(save_dir, "trainer_config.json"), "w", encoding="utf-8") as f:
                 json.dump({
                     "model_dir": save_dir,
-                    "pretrained_model_name_or_path": save_dir,
+                    "pretrained_model_name_or_path": self.pretrained_model_name_or_path,
                     "num_labels": self.num_labels,
                     "pred_strategy": self.pred_strategy,
+                    "use_mcd": self.use_mcd,
                     "thresh": self.thresh,
                     "batch_size": self.batch_size,
                     "learning_rate": self.learning_rate,
@@ -84,9 +83,15 @@ class TransformersNLITrainer:
         self.model.save_pretrained(save_dir)
 
     @staticmethod
-    def from_pretrained(model_dir):
+    def from_pretrained(model_dir, **config_override_kwargs):
         with open(os.path.join(model_dir, "trainer_config.json"), "r", encoding="utf-8") as f:
             pretrained_config = json.load(f)
+
+        pretrained_config["pretrained_model_name_or_path"] = model_dir
+
+        for k in config_override_kwargs:
+            logging.info(f"from_pretrained: overriding '{k}' ({k}={config_override_kwargs[k]})")
+            pretrained_config[k] = config_override_kwargs[k]
 
         instance = TransformersNLITrainer(**pretrained_config)
         return instance
