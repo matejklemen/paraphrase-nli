@@ -194,14 +194,17 @@ if __name__ == "__main__":
         logging.info(f"Writing left-to-right prediction information to file ({len(dataset)} rows)")
         pd.DataFrame(l2r_preds).to_csv(os.path.join(l2r_dir, f"{dataset_name}_preds.csv"),
                                        sep=",", index=False, quoting=csv.QUOTE_ALL)
-        multicolumn_visualization(
-            column_names=["Input", "Ground truth", f"{args.l2r_strategy} (l2r)"],
-            column_values=[dataset.str_premise, dataset.str_hypothesis, l2r_preds["label"]],
-            column_metric_data=[None, None, {"mean(P(y=ent))": l2r_preds["mean_proba"], "sd(P(y=ent))": l2r_preds["sd_proba"], "y": l2r_preds["label"]}],
-            global_metric_data=[None, None, {"num_entailment": int(torch.sum(ent_mask))}],
-            sort_by_system=(2, 0),  # sort by mean_proba
-            path=os.path.join(l2r_dir, f"{dataset_name}_visualization.html")
-        )
+        if "train" not in dataset_name:
+            multicolumn_visualization(
+                column_names=["Input", "Ground truth", f"{args.l2r_strategy} (l2r)"],
+                column_values=[dataset.str_premise, dataset.str_hypothesis, l2r_preds["label"]],
+                column_metric_data=[None, None, {"mean(P(y=ent))": l2r_preds["mean_proba"], "sd(P(y=ent))": l2r_preds["sd_proba"], "y": l2r_preds["label"]}],
+                global_metric_data=[None, None, {"num_entailment": int(torch.sum(ent_mask))}],
+                sort_by_system=(2, 0),  # sort by mean_proba
+                path=os.path.join(l2r_dir, f"{dataset_name}_visualization.html")
+            )
+        else:
+            logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
         ent_inds = torch.flatten(torch.nonzero(ent_mask)).tolist()
 
@@ -243,16 +246,20 @@ if __name__ == "__main__":
         logging.info(f"Writing right-to-left prediction information to file ({len(dataset)} rows)")
         pd.DataFrame(r2l_preds).to_csv(os.path.join(r2l_dir, f"{dataset_name}_preds.csv"),
                                        sep=",", index=False, quoting=csv.QUOTE_ALL)
-        multicolumn_visualization(
-            column_names=["Input", "Ground truth", f"{args.r2l_strategy} (r2l)"],
-            column_values=[dataset.str_premise, dataset.str_hypothesis, r2l_preds["label"]],
-            column_metric_data=[None, None,
-                                {"mean(P(y=ent))": r2l_preds["mean_proba"], "sd(P(y=ent))": r2l_preds["sd_proba"],
-                                 "y": r2l_preds["label"]}],
-            global_metric_data=[None, None, {"num_entailment": int(torch.sum(rev_ent_mask))}],
-            sort_by_system=(2, 0),  # sort by mean_proba
-            path=os.path.join(r2l_dir, f"{dataset_name}_visualization.html")
-        )
+
+        if "train" not in dataset_name:
+            multicolumn_visualization(
+                column_names=["Input", "Ground truth", f"{args.r2l_strategy} (r2l)"],
+                column_values=[dataset.str_premise, dataset.str_hypothesis, r2l_preds["label"]],
+                column_metric_data=[None, None,
+                                    {"mean(P(y=ent))": r2l_preds["mean_proba"], "sd(P(y=ent))": r2l_preds["sd_proba"],
+                                     "y": r2l_preds["label"]}],
+                global_metric_data=[None, None, {"num_entailment": int(torch.sum(rev_ent_mask))}],
+                sort_by_system=(2, 0),  # sort by mean_proba
+                path=os.path.join(r2l_dir, f"{dataset_name}_visualization.html")
+            )
+        else:
+            logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
         logging.info(f"{len(rev_ent_inds)} paraphrases found!")
         paras = {"sequence1": [], "sequence2": []}
