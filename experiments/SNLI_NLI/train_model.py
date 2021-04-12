@@ -5,6 +5,7 @@ import sys
 from argparse import ArgumentParser
 
 import torch
+from sklearn.metrics import f1_score
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast
 
 from src.data.nli import SNLITransformersDataset
@@ -107,5 +108,10 @@ if __name__ == "__main__":
         if hasattr(test_set, "labels"):
             test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], test_set.labels))) / len(test_set)
             logging.info(f"Test accuracy: {test_accuracy: .4f}")
+
+            if args.binary_task:
+                test_f1 = f1_score(y_true=test_set.labels.numpy(),
+                                   y_pred=test_res["pred_label"].cpu().numpy())
+                logging.info(f"Test binary F1: {test_f1: .4f}")
         else:
             logging.info(f"Skipping test set evaluation because no labels were found!")
