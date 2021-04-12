@@ -143,7 +143,8 @@ if __name__ == "__main__":
         model.fit(train_X, train_y)
 
         dev_preds = model.predict(dev_X)
-        logging.info(f"\tDev accuracy: {accuracy_score(y_true=dev_y, y_pred=dev_preds)}")
+        logging.info(f"\tDev accuracy: {accuracy_score(y_true=dev_y, y_pred=dev_preds): .4f}")
 
         test_preds = model.predict(test_X)
-        logging.info(f"\tTest accuracy: {accuracy_score(y_true=test_y, y_pred=test_preds)}")
+        logging.info(f"\tTest accuracy: {accuracy_score(y_true=test_y, y_pred=test_preds): .4f}")
+        logging.info(f"\tTest majority: {test_y.sum() / len(test_y): .4f}")
