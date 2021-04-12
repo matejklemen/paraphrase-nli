@@ -60,7 +60,7 @@ if __name__ == "__main__":
     elif args.model_type == "xlm-roberta":
         tokenizer_cls = XLMRobertaTokenizerFast
     else:
-        raise NotImplementedError("Model_type '{args.model_type}' is not supported")
+        raise NotImplementedError(f"Model_type '{args.model_type}' is not supported")
 
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)

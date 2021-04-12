@@ -107,7 +107,7 @@ if __name__ == "__main__":
     elif args.model_type == "xlm-roberta":
         tokenizer_cls = XLMRobertaTokenizerFast
     else:
-        raise NotImplementedError("Model_type '{args.model_type}' is not supported")
+        raise NotImplementedError(f"Model_type '{args.model_type}' is not supported")
 
     model = TransformersNLITrainer.from_pretrained(args.pretrained_name_or_path,
                                                    device=("cpu" if args.use_cpu else "cuda"),
