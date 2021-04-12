@@ -4,12 +4,14 @@ import os
 import sys
 from argparse import ArgumentParser
 
-import torch
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast
 
 from src.data.nli import SNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
+
+import numpy as np
+import matplotlib.pyplot as plt
 
 parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug")
@@ -106,12 +108,38 @@ if __name__ == "__main__":
         trainer = TransformersNLITrainer.from_pretrained(args.experiment_dir)
         test_res = trainer.evaluate(test_set)
         if hasattr(test_set, "labels"):
-            test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], test_set.labels))) / len(test_set)
-            logging.info(f"Test accuracy: {test_accuracy: .4f}")
+            np_labels = test_set.labels.numpy()
+            np_pred = test_set["pred_label"].numpy()
 
-            if args.binary_task:
-                test_f1 = f1_score(y_true=test_set.labels.numpy(),
-                                   y_pred=test_res["pred_label"].cpu().numpy())
-                logging.info(f"Test binary F1: {test_f1: .4f}")
+            bin_labels = (np_labels == test_set.label2idx["entailment"]).astype(np.int32)
+            bin_pred = (np_pred == test_set.label2idx["entailment"]).astype(np.int32)
+
+            confusion_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
+            plt.matshow(confusion_matrix, cmap="Blues")
+            for (i, j), v in np.ndenumerate(confusion_matrix):
+                plt.text(j, i, v, ha='center', va='center',
+                         bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
+            plt.xticks(np.arange(len(test_set.label_names)), test_set.label_names)
+            plt.yticks(np.arange(len(test_set.label_names)), test_set.label_names)
+            plt.xlabel("(y_pred)")
+
+            plt.savefig(os.path.join(args.experiment_dir, "confusion_matrix.png"))
+            logging.info(f"Confusion matrix:\n {confusion_matrix}")
+
+            model_metrics = {
+                "accuracy": accuracy_score(y_true=np_labels, y_pred=np_pred),
+                "macro_precision": precision_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+                "macro_recall": recall_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+                "macro_f1": f1_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+                "binary_accuracy": accuracy_score(y_true=bin_labels, y_pred=bin_pred),
+                "binary_precision": precision_score(y_true=bin_labels, y_pred=bin_pred),
+                "binary_recall": recall_score(y_true=bin_labels, y_pred=bin_pred),
+                "binary_f1": f1_score(y_true=bin_labels, y_pred=bin_pred)
+            }
+            with open(os.path.join(args.experiment_dir, "metrics.json"), "w") as f_metrics:
+                logging.info(model_metrics)
+                json.dump(model_metrics, fp=f_metrics, indent=4)
+
+            logging.info(model_metrics)
         else:
             logging.info(f"Skipping test set evaluation because no labels were found!")

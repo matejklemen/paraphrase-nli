@@ -4,3 +4,5 @@ datasets
 pandas
 sklearn
 tqdm
+numpy
+matplotlib

@@ -5,13 +5,9 @@ import os
 import sys
 from argparse import ArgumentParser
 from time import time
-from warnings import warn
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import torch
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast
 
 from src.data.nli import SNLITransformersDataset
@@ -114,50 +110,7 @@ if __name__ == "__main__":
                                                    batch_size=args.batch_size)
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
 
-    test_set = SNLITransformersDataset("test", tokenizer=tokenizer,
-                                       max_length=args.max_seq_len, return_tensors="pt")
-    warn("Non-binary evaluation metrics (e.g. macro_precision) are calculated using a fixed strategy (argmax), "
-         "while binary ones take into account the optional strategy")
-    test_res = get_predictions(model, test_set,
-                               pred_strategy="argmax",
-                               thresh=args.l2r_thresh,
-                               num_mcd_rounds=args.l2r_mcd_rounds)
-
-    np_labels = test_set.labels.numpy()
-    np_pred = test_res["pred_label"].numpy()
-
-    bin_labels = (np_labels == test_set.label2idx["entailment"]).astype(np.int32)
-    bin_pred = (np_pred == test_set.label2idx["entailment"]).astype(np.int32)
-    if args.r2l_strategy == "thresh":
-        assert args.r2l_thresh is not None
-        bin_pred = (test_res["mean_proba"][:, test_set.label2idx["entailment"]] > args.r2l_thresh).numpy().astype(np.int32)
-
-    confusion_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
-    plt.matshow(confusion_matrix, cmap="Blues")
-    for (i, j), v in np.ndenumerate(confusion_matrix):
-        plt.text(j, i, v, ha='center', va='center',
-                 bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
-    plt.xticks(np.arange(len(test_set.label_names)), test_set.label_names)
-    plt.yticks(np.arange(len(test_set.label_names)), test_set.label_names)
-    plt.xlabel("(y_pred)")
-
-    plt.savefig(os.path.join(args.experiment_dir, "confusion_matrix.png"))
-    logging.info(f"Confusion matrix:\n {confusion_matrix}")
-
-    model_metrics = {
-        "accuracy": accuracy_score(y_true=np_labels, y_pred=np_pred),
-        "macro_precision": precision_score(y_true=np_labels, y_pred=np_pred, average="macro"),
-        "macro_recall": recall_score(y_true=np_labels, y_pred=np_pred, average="macro"),
-        "macro_f1": f1_score(y_true=np_labels, y_pred=np_pred, average="macro"),
-        "binary_accuracy": accuracy_score(y_true=bin_labels, y_pred=bin_pred),
-        "binary_precision": precision_score(y_true=bin_labels, y_pred=bin_pred),
-        "binary_recall": recall_score(y_true=bin_labels, y_pred=bin_pred),
-        "binary_f1": f1_score(y_true=bin_labels, y_pred=bin_pred)
-    }
-
-    with open(os.path.join(args.experiment_dir, "metrics.json"), "w") as f_metrics:
-        logging.info(model_metrics)
-        json.dump(model_metrics, fp=f_metrics, indent=4)
+    model_metrics = {}
 
     all_paras = {
         "sequence1": [],
