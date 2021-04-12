@@ -64,7 +64,7 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError("Model_type '{args.model_type}' is not supported")
 
-    model = embedder_cls.from_pretrained(args.pretrained_name_or_path, return_dict=True)
+    model = embedder_cls.from_pretrained(args.pretrained_name_or_path, return_dict=True).to(DEVICE)
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
 
     all_data = {}
