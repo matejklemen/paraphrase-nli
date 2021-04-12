@@ -9,18 +9,18 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, \
-    BertModel, RobertaModel, XLMRobertaModel
+    BertForSequenceClassification, RobertaForSequenceClassification, XLMRobertaForSequenceClassification
 
 from src.data.nli import SNLITransformersDataset
 
 parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="distribution_debug")
 parser.add_argument("--pretrained_name_or_path", type=str,
-                    default="/home/matej/Documents/embeddia/paraphrasing/nli2paraphrases/models/SNLI_NLI/snli-bert-base-cased-combined-2e-5-maxlen51")
-parser.add_argument("--model_type", type=str, default="bert",
+                    default="/home/matej/Documents/embeddia/paraphrasing/nli2paraphrases/models/SNLI_NLI/snli-roberta-base-combined-2e-5-maxlen42")
+parser.add_argument("--model_type", type=str, default="roberta",
                     choices=["bert", "roberta", "xlm-roberta"])
 
-parser.add_argument("--max_seq_len", type=int, default=41)
+parser.add_argument("--max_seq_len", type=int, default=42)
 parser.add_argument("--batch_size", type=int, default=8)
 
 parser.add_argument("--use_cpu", action="store_true")
@@ -54,21 +54,46 @@ if __name__ == "__main__":
     # No AutoTokenizerFast at the moment?
     if args.model_type == "bert":
         tokenizer_cls = BertTokenizerFast
-        embedder_cls = BertModel
+        model_cls = BertForSequenceClassification
+
+        def extract_embeddings(model_obj: BertForSequenceClassification, **data_dict):
+            outputs = model_obj.bert(input_ids=data_dict["input_ids"],
+                                     token_type_ids=data_dict["token_type_ids"],
+                                     attention_mask=data_dict["attention_mask"],
+                                     return_dict=True)
+            return outputs["pooler_output"]
+
     elif args.model_type == "roberta":
         tokenizer_cls = RobertaTokenizerFast
-        embedder_cls = RobertaModel
+        model_cls = RobertaForSequenceClassification
+
+        def extract_embeddings(model_obj: RobertaForSequenceClassification, **data_dict):
+            outputs = model_obj.roberta(input_ids=data_dict["input_ids"],
+                                        attention_mask=data_dict["attention_mask"],
+                                        return_dict=True)
+            pooled_output = outputs["last_hidden_state"][:, 0, :]
+            return pooled_output
+
     elif args.model_type == "xlm-roberta":
         tokenizer_cls = XLMRobertaTokenizerFast
-        embedder_cls = XLMRobertaModel
-    else:
-        raise NotImplementedError("Model_type '{args.model_type}' is not supported")
+        model_cls = XLMRobertaForSequenceClassification
 
-    model = embedder_cls.from_pretrained(args.pretrained_name_or_path, return_dict=True).to(DEVICE)
+        def extract_embeddings(model_obj: XLMRobertaForSequenceClassification, **data_dict):
+            outputs = model_obj.roberta(input_ids=data_dict["input_ids"],
+                                        attention_mask=data_dict["attention_mask"],
+                                        return_dict=True)
+            pooled_output = outputs["last_hidden_state"][:, 0, :]
+            return pooled_output
+
+    else:
+        raise NotImplementedError(f"Model_type '{args.model_type}' is not supported")
+
+    model = model_cls.from_pretrained(args.pretrained_name_or_path, return_dict=True).to(DEVICE)
+    model.eval()
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
 
     all_data = {}
-    for dataset_name in ["train", "validation", "test"]:
+    for dataset_name in ["test"]:
         dataset = SNLITransformersDataset(dataset_name, tokenizer=tokenizer,
                                           max_length=args.max_seq_len, return_tensors="pt")
 
@@ -85,11 +110,11 @@ if __name__ == "__main__":
                 for idx_batch in tqdm(range(num_batches), total=num_batches):
                     s_b, e_b = idx_batch * args.batch_size, (idx_batch + 1) * args.batch_size
 
-                    res = model(**{k: v[s_b: e_b].to(DEVICE) for k, v in encoded.items()})
-                    pooler_output = res["pooler_output"].cpu()
+                    seq_repr = extract_embeddings(model,
+                                                  **{k: v[s_b: e_b].to(DEVICE) for k, v in encoded.items()}).cpu()
 
-                    embeddings.append(pooler_output)
-                    distr_labels.extend([curr_label] * pooler_output.shape[0])
+                    embeddings.append(seq_repr)
+                    distr_labels.extend([curr_label] * seq_repr.shape[0])
 
         embeddings = torch.cat(embeddings)
         distr_labels = torch.tensor(distr_labels, dtype=torch.long)
@@ -100,13 +125,25 @@ if __name__ == "__main__":
 
         all_data[dataset_name] = {"X": embeddings.numpy(), "y": distr_labels.numpy()}
 
+    num_examples = len(all_data["test"]["X"])
+
+    # Split the embedded test examples into a training, validation and test set
+    indices = torch.randperm(num_examples).numpy()
+    train_inds = indices[:int(0.8 * num_examples)]
+    dev_inds = indices[int(0.8 * num_examples): int(0.9 * num_examples)]
+    test_inds = indices[int(0.9 * num_examples):]
+    train_X, train_y = all_data["test"]["X"][train_inds], all_data["test"]["y"][train_inds]
+    dev_X, dev_y = all_data["test"]["X"][dev_inds], all_data["test"]["y"][dev_inds]
+    test_X, test_y = all_data["test"]["X"][test_inds], all_data["test"]["y"][test_inds]
+    logging.info(f"{len(train_inds)} training examples, {len(dev_inds)} dev examples, {len(test_inds)} test examples")
+
     for n_estimators in [50, 100, 500, 1000]:
         logging.info(f"Fitting random forest with n_estimators={n_estimators}")
         model = RandomForestClassifier(n_estimators=n_estimators, n_jobs=-1)
-        model.fit(all_data["train"]["X"], all_data["train"]["y"])
+        model.fit(train_X, train_y)
 
-        val_preds = model.predict(all_data["validation"]["X"])
-        logging.info(f"\tDev accuracy: {accuracy_score(y_true=all_data['validation']['y'], y_pred=val_preds)}")
+        dev_preds = model.predict(dev_X)
+        logging.info(f"\tDev accuracy: {accuracy_score(y_true=dev_y, y_pred=dev_preds)}")
 
-        test_preds = model.predict(all_data["test"]["X"])
-        logging.info(f"\tTest accuracy: {accuracy_score(y_true=all_data['test']['y'], y_pred=test_preds)}")
+        test_preds = model.predict(test_X)
+        logging.info(f"\tTest accuracy: {accuracy_score(y_true=test_y, y_pred=test_preds)}")
