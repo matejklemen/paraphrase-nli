@@ -3,10 +3,11 @@ import logging
 import os
 from time import time
 from typing import Optional
-from warnings import warn
 
 import torch
 import torch.optim as optim
+from sklearn.metrics import f1_score
+from torch.nn import CrossEntropyLoss
 from torch.utils.data import Subset, DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification
@@ -15,7 +16,8 @@ from transformers import AutoModelForSequenceClassification
 class TransformersNLITrainer:
     def __init__(self, model_dir, pretrained_model_name_or_path, num_labels, pred_strategy="argmax", thresh=None,
                  batch_size=24, learning_rate=6.25e-5, validate_every_n_steps=5_000, early_stopping_tol=5,
-                 use_mcd: Optional[bool] = False, optimized_metric="accuracy", device="cuda"):
+                 use_mcd: Optional[bool] = False, class_weights: Optional = None,
+                 optimized_metric="accuracy", device="cuda"):
         self.model_save_path = model_dir
 
         self.pretrained_model_name_or_path = pretrained_model_name_or_path
@@ -52,6 +54,16 @@ class TransformersNLITrainer:
             raise NotImplementedError(f"Prediction strategy '{pred_strategy}' not supported")
 
         self.optimized_metric = optimized_metric
+        if self.optimized_metric == "binary_f1":
+            assert self.num_labels == 2
+
+        if class_weights is None:
+            self.class_weights = torch.ones(self.num_labels, dtype=torch.float32)
+        else:
+            assert len(class_weights) == self.num_labels
+            self.class_weights = torch.tensor(class_weights, dtype=torch.float32)
+        self.class_weights = self.class_weights.to(self.device)
+
         self.use_mcd = use_mcd
         self.predict_label = predict_fn
         self.model = AutoModelForSequenceClassification.from_pretrained(self.pretrained_model_name_or_path,
@@ -76,6 +88,7 @@ class TransformersNLITrainer:
                     "learning_rate": self.learning_rate,
                     "validate_every_n_steps": self.validate_every_n_steps,
                     "early_stopping_tol": self.early_stopping_tol,
+                    "class_weights": self.class_weights.cpu().tolist(),
                     "optimized_metric": self.optimized_metric,
                     "device": self.device_str
                 }, fp=f, indent=4)
@@ -97,18 +110,21 @@ class TransformersNLITrainer:
         return instance
 
     def train(self, train_dataset):
+        criterion = CrossEntropyLoss(weight=self.class_weights)
+
         self.model.train()
         num_batches = (len(train_dataset) + self.batch_size - 1) // self.batch_size
         train_loss = 0.0
         for curr_batch in tqdm(DataLoader(train_dataset, shuffle=False, batch_size=self.batch_size),
                                total=num_batches):
             res = self.model(**{k: v.to(self.device) for k, v in curr_batch.items()})
+            loss = criterion(res["logits"].view(-1, self.num_labels), curr_batch["labels"].view(-1))
 
-            res["loss"].backward()
+            loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
 
-            train_loss += float(res["loss"])
+            train_loss += float(loss)
 
         return {"train_loss": train_loss}
 
@@ -179,6 +195,15 @@ class TransformersNLITrainer:
                 if self.optimized_metric == "loss":
                     is_better = val_loss < best_metric
                     val_metric = val_loss
+                elif self.optimized_metric == "binary_f1":
+                    val_acc = float(torch.sum(torch.eq(val_res["pred_label"], val_dataset.labels))) / len(val_dataset)
+                    logging.info(f"(Not being optimized) Validation accuracy: {val_acc: .4f}")
+
+                    val_f1 = f1_score(y_true=val_dataset.labels.cpu().numpy(),
+                                      y_pred=val_res["pred_label"].cpu().numpy())
+                    logging.info(f"Validation binary F1: {val_f1: .4f}")
+                    is_better = val_f1 > best_metric
+                    val_metric = val_f1
                 else:
                     val_acc = float(torch.sum(torch.eq(val_res["pred_label"], val_dataset.labels))) / len(val_dataset)
                     logging.info(f"Validation accuracy: {val_acc: .4f}")
@@ -203,4 +228,3 @@ class TransformersNLITrainer:
                 break
 
         logging.info(f"Training took {time() - train_start:.4f}s")
-

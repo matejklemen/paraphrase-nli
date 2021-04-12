@@ -16,6 +16,8 @@ parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-un
 parser.add_argument("--model_type", type=str, default="bert",
                     choices=["bert", "roberta", "xlm-roberta"])
 
+parser.add_argument("--binary_task", action="store_true",
+                    help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
 parser.add_argument("--combine_train_dev", action="store_true")
 
 parser.add_argument("--num_epochs", type=int, default=3)
@@ -65,21 +67,27 @@ if __name__ == "__main__":
     test_set = None
     if args.combine_train_dev:
         train_set = SNLITransformersDataset(("train", "validation"), tokenizer=tokenizer,
-                                            max_length=args.max_seq_len, return_tensors="pt")
+                                            max_length=args.max_seq_len, return_tensors="pt",
+                                            binarize=args.binary_task)
         dev_set = SNLITransformersDataset("test", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
+                                          max_length=args.max_seq_len, return_tensors="pt",
+                                          binarize=args.binary_task)
     else:
         train_set = SNLITransformersDataset("train", tokenizer=tokenizer,
-                                            max_length=args.max_seq_len, return_tensors="pt")
+                                            max_length=args.max_seq_len, return_tensors="pt",
+                                            binarize=args.binary_task)
         dev_set = SNLITransformersDataset("validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
+                                          max_length=args.max_seq_len, return_tensors="pt",
+                                          binarize=args.binary_task)
         test_set = SNLITransformersDataset("test", tokenizer=tokenizer,
-                                           max_length=args.max_seq_len, return_tensors="pt")
+                                           max_length=args.max_seq_len, return_tensors="pt",
+                                           binarize=args.binary_task)
 
     logging.info(f"Loaded {len(train_set)} training examples, "
                  f"{len(dev_set)} dev examples and "
                  f"{len(test_set) if test_set is not None else 0} test examples")
 
+    # if binary task: we have twice as many non-entailments (i.e. neutral and contradiction) as entailments
     trainer = TransformersNLITrainer(args.experiment_dir,
                                      pretrained_model_name_or_path=args.pretrained_name_or_path,
                                      num_labels=len(train_set.label_names),
@@ -87,6 +95,8 @@ if __name__ == "__main__":
                                      learning_rate=args.learning_rate,
                                      validate_every_n_steps=args.validate_every_n_examples,
                                      early_stopping_tol=args.early_stopping_rounds,
+                                     class_weights=([1.0, 2.0] if args.binary_task else None),
+                                     optimized_metric=("binary_f1" if args.binary_task else "accuracy"),
                                      device=("cuda" if not args.use_cpu else "cpu"))
 
     trainer.run(train_dataset=train_set, val_dataset=dev_set, num_epochs=args.num_epochs)

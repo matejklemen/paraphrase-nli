@@ -3,3 +3,4 @@ transformers
 datasets
 pandas
 sklearn
+tqdm
