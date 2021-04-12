@@ -81,7 +81,7 @@ class SNLITransformersDataset(TransformersSeqPairDataset):
 class MultiNLITransformersDataset(TransformersSeqPairDataset):
     def __init__(self, split: Union[str, Iterable[str]], tokenizer,
                  max_length: Optional[int] = None, return_tensors: Optional[str] = None,
-                 custom_label_names: Optional[List[str]] = None):
+                 custom_label_names: Optional[List[str]] = None, binarize: Optional[bool] = False):
         _split = (split,) if isinstance(split, str) else split
 
         datasets_list = [datasets.load_dataset("multi_nli", split=curr_split) for curr_split in _split]
@@ -120,6 +120,12 @@ class MultiNLITransformersDataset(TransformersSeqPairDataset):
 
         encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
         encoded["labels"] = valid_label
+
+        if binarize:
+            encoded["labels"] = (encoded["labels"] == self.label2idx["entailment"]).long()
+            self.label_names = ["not_entailment", "entailment"]
+            self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
+            self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
 
         super().__init__(**encoded)
 
