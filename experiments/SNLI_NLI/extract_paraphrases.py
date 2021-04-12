@@ -24,6 +24,9 @@ parser.add_argument("--max_seq_len", type=int, default=51)
 parser.add_argument("--batch_size", type=int, default=16,
                     help="Evaluation batch size. Note that this can generally be set much higher than in training mode")
 
+parser.add_argument("--binary_task", action="store_true",
+                    help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
+
 parser.add_argument("--l2r_strategy", choices=["ground_truth", "argmax", "thresh"], default="ground_truth")
 parser.add_argument("--r2l_strategy", choices=["argmax", "thresh"], default="argmax")
 parser.add_argument("--l2r_thresh", type=float, default=None, help="Optional (used if l2r_strategy is 'thresh')")
@@ -120,7 +123,8 @@ if __name__ == "__main__":
     t1 = time()
     for dataset_name in ["train", "validation", "test"]:
         dataset = SNLITransformersDataset(dataset_name, tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
+                                          max_length=args.max_seq_len, return_tensors="pt",
+                                          binarize=args.binary_task)
         logging.info(f"{dataset_name}: loaded {len(dataset)} examples")
         l2r_preds = {
             "premise": dataset.str_premise,
