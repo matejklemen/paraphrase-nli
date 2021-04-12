@@ -118,7 +118,7 @@ class TransformersNLITrainer:
         for curr_batch in tqdm(DataLoader(train_dataset, shuffle=False, batch_size=self.batch_size),
                                total=num_batches):
             res = self.model(**{k: v.to(self.device) for k, v in curr_batch.items()})
-            loss = criterion(res["logits"].view(-1, self.num_labels), curr_batch["labels"].view(-1))
+            loss = criterion(res["logits"].view(-1, self.num_labels), curr_batch["labels"].view(-1).to(self.device))
 
             loss.backward()
             self.optimizer.step()
