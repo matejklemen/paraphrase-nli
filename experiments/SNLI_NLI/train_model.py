@@ -109,7 +109,7 @@ if __name__ == "__main__":
         test_res = trainer.evaluate(test_set)
         if hasattr(test_set, "labels"):
             np_labels = test_set.labels.numpy()
-            np_pred = test_set["pred_label"].numpy()
+            np_pred = test_res["pred_label"].numpy()
 
             bin_labels = (np_labels == test_set.label2idx["entailment"]).astype(np.int32)
             bin_pred = (np_pred == test_set.label2idx["entailment"]).astype(np.int32)
