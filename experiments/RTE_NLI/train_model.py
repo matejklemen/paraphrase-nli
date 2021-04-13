@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, BertTokenizer, \
-    RobertaTokenizer, XLMRobertaTokenizer
+    RobertaTokenizer, XLMRobertaTokenizer, CamembertTokenizer
 
 from src.data.nli import RTETransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
@@ -17,7 +17,7 @@ parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
 parser.add_argument("--model_type", type=str, default="bert",
-                    choices=["bert", "roberta", "xlm-roberta"])
+                    choices=["bert", "roberta", "xlm-roberta", "custom-sloberta"])
 
 parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/SloSuperGLUE/SuperGLUE-GoogleMT/csv/RTE/train.csv")
 parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/SloSuperGLUE/SuperGLUE-GoogleMT/csv/RTE/val.csv")
@@ -65,6 +65,8 @@ if __name__ == "__main__":
         tokenizer_cls = RobertaTokenizer if args.no_fast_tokenizer else RobertaTokenizerFast
     elif args.model_type == "xlm-roberta":
         tokenizer_cls = XLMRobertaTokenizer if args.no_fast_tokenizer else XLMRobertaTokenizerFast
+    elif args.model_type == "custom-sloberta":
+        tokenizer_cls = CamembertTokenizer
     else:
         raise NotImplementedError(f"Model_type '{args.model_type}' is not supported")
 
