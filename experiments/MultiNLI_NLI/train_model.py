@@ -189,7 +189,7 @@ if __name__ == "__main__":
                 if curr_thresh == "argmax":
                     bin_pred = (np_pred == test_set.label2idx["entailment"]).astype(np.int32)
                 else:
-                    bin_pred = (np_pred[:, test_set.label2idx["entailment"]] > curr_thresh).astype(np.int32)
+                    bin_pred = (test_res["pred_proba"][:, test_set.label2idx["entailment"]].numpy() > curr_thresh).astype(np.int32)
 
                 confusion_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
                 plt.matshow(confusion_matrix, cmap="Blues")
