@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, BertTokenizer, \
     RobertaTokenizer, XLMRobertaTokenizer, CamembertTokenizer
@@ -19,13 +20,16 @@ parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-un
 parser.add_argument("--model_type", type=str, default="bert",
                     choices=["bert", "roberta", "xlm-roberta", "custom-sloberta"])
 
-parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/SloSuperGLUE/SuperGLUE-GoogleMT/csv/RTE/train.csv")
-parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/SloSuperGLUE/SuperGLUE-GoogleMT/csv/RTE/val.csv")
-parser.add_argument("--test_path", type=str, default="/home/matej/Documents/data/SloSuperGLUE/SuperGLUE-GoogleMT/csv/RTE/test.csv")
-parser.add_argument("--combine_train_dev", action="store_true")
+parser.add_argument("--create_test_from_validation", action="store_true",
+                    help="If set, split the validation set in half and use one half as a test set substitute")
+
+parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/RTE/train.csv")
+parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/RTE/val.csv")
+parser.add_argument("--test_path", type=str, default="/home/matej/Documents/data/RTE/test.csv")
 
 parser.add_argument("--num_epochs", type=int, default=3)
 # crosloengual BERT: 95th perc.=192, 99th perc.=247
+# sloberta: 95th perc.=177, 99th perc.=224
 parser.add_argument("--max_seq_len", type=int, default=41)
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--learning_rate", type=float, default=2e-5)
@@ -73,19 +77,33 @@ if __name__ == "__main__":
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
+    train_set = RTETransformersDataset(args.train_path, tokenizer=tokenizer,
+                                       max_length=args.max_seq_len, return_tensors="pt")
+    dev_set = RTETransformersDataset(args.dev_path, tokenizer=tokenizer,
+                                     max_length=args.max_seq_len, return_tensors="pt")
     test_set = None
-    if args.combine_train_dev:
-        train_set = RTETransformersDataset((args.train_path, args.dev_path), tokenizer=tokenizer,
-                                           max_length=args.max_seq_len, return_tensors="pt")
-        dev_set = RTETransformersDataset(args.test_path, tokenizer=tokenizer,
-                                         max_length=args.max_seq_len, return_tensors="pt")
-    else:
-        train_set = RTETransformersDataset(args.train_path, tokenizer=tokenizer,
-                                           max_length=args.max_seq_len, return_tensors="pt")
-        dev_set = RTETransformersDataset(args.dev_path, tokenizer=tokenizer,
-                                         max_length=args.max_seq_len, return_tensors="pt")
+    if args.test_path is not None:
         test_set = RTETransformersDataset(args.test_path, tokenizer=tokenizer,
                                           max_length=args.max_seq_len, return_tensors="pt")
+
+    if args.create_test_from_validation:
+        indices = torch.randperm(len(dev_set)).tolist()
+        dev_indices = indices[: int(0.5 * len(indices))]
+        test_indices = indices[int(0.5 * len(indices)):]
+
+        # Instantiate dummy set, override with actual data
+        test_set = RTETransformersDataset(args.dev_path, tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
+
+        # NOTE: order important here! First copy to test set, then fix dev set itself
+        for curr_set, curr_indices in [(test_set, test_indices), (dev_set, dev_indices)]:
+            curr_set.str_premise = [dev_set.str_premise[_i] for _i in curr_indices]
+            curr_set.str_hypothesis = [dev_set.str_hypothesis[_i] for _i in curr_indices]
+
+            for attr in dev_set.valid_attrs:
+                setattr(curr_set, attr, getattr(dev_set, attr)[curr_indices])
+
+            curr_set.num_examples = len(curr_set.str_premise)
 
     logging.info(f"Loaded {len(train_set)} training examples, "
                  f"{len(dev_set)} dev examples and "
