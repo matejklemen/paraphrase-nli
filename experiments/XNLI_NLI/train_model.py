@@ -8,18 +8,19 @@ from argparse import ArgumentParser
 import pandas as pd
 import torch
 import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, CamembertTokenizerFast, \
     AutoTokenizer
 
 from src.data.nli import XNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
 
+import matplotlib.pyplot as plt
+
 parser = ArgumentParser()
 parser.add_argument("--lang", type=str, default="de")
 parser.add_argument("--en_validation", action="store_true",
                     help="Use English instead of target (--lang) validation set")
-parser.add_argument("--bilingual_validation", action="store_true",
-                    help="Use combined English and target (--lang) validation set")
 
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-uncased")
@@ -81,69 +82,61 @@ if __name__ == "__main__":
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
-    if args.lang == "all_languages":
-        train_set = XNLITransformersDataset(ALL_LANGS, ["train"] * len(ALL_LANGS), tokenizer=tokenizer,
-                                            max_length=args.max_seq_len, return_tensors="pt")
+    train_set = XNLITransformersDataset("en", "train", tokenizer=tokenizer,
+                                        max_length=args.max_seq_len, return_tensors="pt")
+
+    # Override parts with custom (translated) data
+    if args.custom_train_path is not None:
+        logging.info(f"Loading custom training set from '{args.custom_train_path}'")
+        df = pd.read_csv(args.custom_train_path, sep="\t", quoting=csv.QUOTE_NONE)
+
+        is_na = np.logical_or(df["premise"].isna(), df["hypo"].isna())
+        logging.info(f"Removing {np.sum(is_na)} sequence pairs due to missing either premise or hypothesis")
+        df = df.loc[np.logical_not(is_na)]
+
+        df["label"] = df["label"].apply(lambda lbl: "contradiction" if lbl.lower() == "contradictory" else lbl)
+        uniq_labels = set(df["label"])
+        assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
+            f"Non-standard labels: {uniq_labels}"
+
+        encoded = tokenizer.batch_encode_plus(list(zip(df["premise"].tolist(), df["hypo"].tolist())),
+                                              max_length=args.max_seq_len, padding="max_length",
+                                              truncation="longest_first", return_tensors="pt")
+        train_set.str_premise = df["premise"].tolist()
+        train_set.str_hypothesis = df["hypo"].tolist()
+        train_set.labels = torch.tensor(list(map(lambda lbl: train_set.label2idx[lbl], df["label"].tolist())))
+        for k, v in encoded.items():
+            setattr(train_set, k, v)
+
+        train_set.num_examples = len(train_set.str_premise)
+
+    if args.en_validation:
+        logging.info(f"Loading English validation set")
+        dev_set = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
     else:
-        train_set = XNLITransformersDataset("en", "train", tokenizer=tokenizer,
-                                            max_length=args.max_seq_len, return_tensors="pt")
-
+        assert args.lang != "all_languages"
+        logging.info(f"Loading validation set in language '{args.lang}'")
+        dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
         # Override parts with custom (translated) data
-        if args.custom_train_path is not None:
-            logging.info(f"Loading custom training set from '{args.custom_train_path}'")
-            df = pd.read_csv(args.custom_train_path, sep="\t", quoting=csv.QUOTE_NONE)
-
-            is_na = np.logical_or(df["premise"].isna(), df["hypo"].isna())
-            logging.info(f"Removing {np.sum(is_na)} sequence pairs due to missing either premise or hypothesis")
-            df = df.loc[np.logical_not(is_na)]
-
-            df["label"] = df["label"].apply(lambda lbl: "contradiction" if lbl.lower() == "contradictory" else lbl)
-            uniq_labels = set(df["label"])
+        if args.custom_dev_path is not None:
+            logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
+            df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
+            uniq_labels = set(df_dev["gold_label"])
             assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
                 f"Non-standard labels: {uniq_labels}"
 
-            encoded = tokenizer.batch_encode_plus(list(zip(df["premise"].tolist(), df["hypo"].tolist())),
+            encoded = tokenizer.batch_encode_plus(list(zip(df_dev["sentence1"].tolist(), df_dev["sentence2"].tolist())),
                                                   max_length=args.max_seq_len, padding="max_length",
                                                   truncation="longest_first", return_tensors="pt")
-            train_set.str_premise = df["premise"].tolist()
-            train_set.str_hypothesis = df["hypo"].tolist()
-            train_set.labels = torch.tensor(list(map(lambda lbl: train_set.label2idx[lbl], df["label"].tolist())))
+            dev_set.str_premise = df_dev["sentence1"].tolist()
+            dev_set.str_hypothesis = df_dev["sentence2"].tolist()
+            dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
             for k, v in encoded.items():
-                setattr(train_set, k, v)
+                setattr(dev_set, k, v)
 
-            train_set.num_examples = len(train_set.str_premise)
-
-    if args.en_validation:
-        dev_set = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
-    elif args.bilingual_validation:
-        dev_set = XNLITransformersDataset(("en", args.lang), ("validation", "validation"), tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
-    else:
-        if args.lang == "all_languages":
-            dev_set = XNLITransformersDataset(ALL_LANGS, ["validation"] * len(ALL_LANGS), tokenizer=tokenizer,
-                                              max_length=args.max_seq_len, return_tensors="pt")
-        else:
-            dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
-                                              max_length=args.max_seq_len, return_tensors="pt")
-            # Override parts with custom (translated) data
-            if args.custom_dev_path is not None:
-                logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
-                df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
-                uniq_labels = set(df_dev["gold_label"])
-                assert all([lbl in uniq_labels for lbl in ["entailment", "neutral", "contradiction"]]), \
-                    f"Non-standard labels: {uniq_labels}"
-
-                encoded = tokenizer.batch_encode_plus(list(zip(df_dev["sentence1"].tolist(), df_dev["sentence2"].tolist())),
-                                                      max_length=args.max_seq_len, padding="max_length",
-                                                      truncation="longest_first", return_tensors="pt")
-                dev_set.str_premise = df_dev["sentence1"].tolist()
-                dev_set.str_hypothesis = df_dev["sentence2"].tolist()
-                dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
-                for k, v in encoded.items():
-                    setattr(dev_set, k, v)
-
-                dev_set.num_examples = len(dev_set.str_premise)
+            dev_set.num_examples = len(dev_set.str_premise)
 
     # If evaluating on all languages, we do this in a different way, reloading all languages later on
     loaded_test_lang = args.lang if args.lang != "all_languages" else "en"
@@ -206,29 +199,107 @@ if __name__ == "__main__":
 
     trainer.run(train_dataset=train_set, val_dataset=dev_set, num_epochs=args.num_epochs)
 
-    if test_set is not None:
-        trainer = TransformersNLITrainer.from_pretrained(args.experiment_dir)
-        # If using English-only or bilingual dev set, obtain a score on monolingual dev set to aid comparison
-        if args.en_validation or args.bilingual_validation:
-            dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
-                                              max_length=args.max_seq_len, return_tensors="pt")
-            dev_res = trainer.evaluate(dev_set)
-            dev_accuracy = float(torch.sum(torch.eq(dev_res["pred_label"], dev_set.labels))) / len(dev_set)
-            logging.info(f"Dev accuracy ('{args.lang}' only): {dev_accuracy: .4f}")
+    # Reload best model
+    trainer = TransformersNLITrainer.from_pretrained(args.experiment_dir)
 
-        all_test_sets = [(args.lang, test_set)]
-        if args.lang == "all_languages":
-            all_test_sets = []
-            for curr_lang in ALL_LANGS:
-                all_test_sets.append((curr_lang, XNLITransformersDataset(curr_lang, "test",
-                                                                         tokenizer=tokenizer,
-                                                                         max_length=args.max_seq_len,
-                                                                         return_tensors="pt")))
-        for curr_lang, curr_test_set in all_test_sets:
-            logging.info(f"Language '{curr_lang}':")
-            test_res = trainer.evaluate(curr_test_set)
-            if hasattr(curr_test_set, "labels"):
-                test_accuracy = float(torch.sum(torch.eq(test_res["pred_label"], curr_test_set.labels))) / len(curr_test_set)
-                logging.info(f"Test accuracy: {test_accuracy: .4f}")
+    if args.lang == "all_languages":
+        dev_set_handles = list(ALL_LANGS)
+        test_set_handles = list(ALL_LANGS)
+    else:
+        dev_set_handles = [args.lang]
+        test_set_handles = [args.lang]
+
+    for curr_handle in dev_set_handles:
+        dev_set = XNLITransformersDataset(curr_handle, "validation", tokenizer=tokenizer,
+                                          max_length=args.max_seq_len, return_tensors="pt")
+        dev_res = trainer.evaluate(dev_set)
+
+        np_labels = dev_set.labels.numpy()
+        np_pred = dev_res["pred_label"].numpy()
+
+        model_metrics = {
+            "accuracy": accuracy_score(y_true=np_labels, y_pred=np_pred),
+            "macro_precision": precision_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+            "macro_recall": recall_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+            "macro_f1": f1_score(y_true=np_labels, y_pred=np_pred, average="macro")
+        }
+
+        bin_labels = (np_labels == dev_set.label2idx["entailment"]).astype(np.int32)
+
+        for curr_thresh in ["argmax", 0.5, 0.75, 0.9]:
+            if curr_thresh == "argmax":
+                bin_pred = (np_pred == dev_set.label2idx["entailment"]).astype(np.int32)
             else:
-                logging.info(f"Skipping test set evaluation because no labels were found!")
+                bin_pred = (dev_res["pred_proba"][:, dev_set.label2idx["entailment"]].numpy() > curr_thresh).astype(np.int32)
+
+            model_metrics[f"thresh-{curr_thresh}"] = {
+                "binary_accuracy": accuracy_score(y_true=bin_labels, y_pred=bin_pred),
+                "binary_precision": precision_score(y_true=bin_labels, y_pred=bin_pred),
+                "binary_recall": recall_score(y_true=bin_labels, y_pred=bin_pred),
+                "binary_f1": f1_score(y_true=bin_labels, y_pred=bin_pred)
+            }
+
+        logging.info(f"[Dev set, {curr_handle}]\n {model_metrics}")
+
+    if test_set is not None:
+        for curr_handle in test_set_handles:
+            curr_test_set = XNLITransformersDataset(curr_handle, "test",
+                                                    tokenizer=tokenizer,
+                                                    max_length=args.max_seq_len,
+                                                    return_tensors="pt")
+            logging.info(f"Language '{curr_handle}':")
+            test_res = trainer.evaluate(curr_test_set)
+
+            np_labels = curr_test_set.labels.numpy()
+            np_pred = test_res["pred_label"].numpy()
+
+            conf_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
+            plt.matshow(conf_matrix, cmap="Blues")
+            for (i, j), v in np.ndenumerate(conf_matrix):
+                plt.text(j, i, v, ha='center', va='center',
+                         bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
+            plt.xticks(np.arange(len(test_set.label_names)), test_set.label_names)
+            plt.yticks(np.arange(len(test_set.label_names)), test_set.label_names)
+            plt.xlabel("(y_pred)")
+
+            plt.savefig(os.path.join(args.experiment_dir, f"{curr_handle}_confusion_matrix.png"))
+            logging.info(f"[Test set, {curr_handle}] Confusion matrix:\n {conf_matrix}")
+
+            model_metrics = {
+                "accuracy": accuracy_score(y_true=np_labels, y_pred=np_pred),
+                "macro_precision": precision_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+                "macro_recall": recall_score(y_true=np_labels, y_pred=np_pred, average="macro"),
+                "macro_f1": f1_score(y_true=np_labels, y_pred=np_pred, average="macro")
+            }
+
+            bin_labels = (np_labels == curr_test_set.label2idx["entailment"]).astype(np.int32)
+
+            for curr_thresh in ["argmax", 0.5, 0.75, 0.9]:
+                if curr_thresh == "argmax":
+                    bin_pred = (np_pred == curr_test_set.label2idx["entailment"]).astype(np.int32)
+                else:
+                    bin_pred = (test_res["pred_proba"][:, curr_test_set.label2idx["entailment"]].numpy() > curr_thresh).astype(np.int32)
+
+                conf_matrix = confusion_matrix(y_true=bin_labels, y_pred=bin_pred)
+                plt.matshow(conf_matrix, cmap="Blues")
+                for (i, j), v in np.ndenumerate(conf_matrix):
+                    plt.text(j, i, v, ha='center', va='center',
+                             bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
+                plt.xticks([0, 1], ["not_ent", "ent"])
+                plt.yticks([0, 1], ["not_ent", "ent"])
+                plt.xlabel("(y_pred)")
+
+                plt.savefig(os.path.join(args.experiment_dir, f"{curr_handle}_bin_confusion_matrix_{curr_thresh}.png"))
+                logging.info(f"[Test set, {curr_handle}] Confusion matrix, T={curr_thresh}:\n {conf_matrix}")
+
+                model_metrics[f"thresh-{curr_thresh}"] = {
+                    "binary_accuracy": accuracy_score(y_true=bin_labels, y_pred=bin_pred),
+                    "binary_precision": precision_score(y_true=bin_labels, y_pred=bin_pred),
+                    "binary_recall": recall_score(y_true=bin_labels, y_pred=bin_pred),
+                    "binary_f1": f1_score(y_true=bin_labels, y_pred=bin_pred)
+                }
+
+            with open(os.path.join(args.experiment_dir, f"{curr_handle}_metrics.json"), "w") as f_metrics:
+                json.dump(model_metrics, fp=f_metrics, indent=4)
+
+            logging.info(f"[Test set, {curr_handle}]\n {model_metrics}")
