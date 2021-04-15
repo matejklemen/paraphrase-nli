@@ -78,7 +78,7 @@ if __name__ == "__main__":
     train_set = MultiNLITransformersDataset("train", tokenizer=tokenizer,
                                             max_length=args.max_seq_len, return_tensors="pt",
                                             binarize=args.binary_task)
-    dev_set = MultiNLITransformersDataset("validation_matched" if args.mode == "matched" else "validation_mismatched",
+    dev_set = MultiNLITransformersDataset(("validation_matched", "validation_mismatched"),
                                           tokenizer=tokenizer,
                                           max_length=args.max_seq_len, return_tensors="pt",
                                           binarize=args.binary_task)
