@@ -26,9 +26,6 @@ parser.add_argument("--batch_size", type=int, default=16,
 
 parser.add_argument("--binary_task", action="store_true",
                     help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
-parser.add_argument("--mode", choices=["matched", "mismatched"], default="matched")
-parser.add_argument("--only_validation", action="store_true", default=True,
-                    help="If set, will only extract paraphrases from validation set (the one, specified by --mode)")
 
 parser.add_argument("--l2r_strategy", choices=["ground_truth", "argmax", "thresh"], default="ground_truth")
 parser.add_argument("--r2l_strategy", choices=["argmax", "thresh"], default="argmax")
@@ -123,9 +120,7 @@ if __name__ == "__main__":
         "sequence2": []
     }
 
-    processed_datasets = ["validation_matched[:100]" if args.mode == "matched" else "validation_mismatched"]
-    if not args.only_validation:
-        processed_datasets.append("train[:100]")
+    processed_datasets = ["train", "validation_matched", "validation_mismatched"]
 
     t1 = time()
     for dataset_name in processed_datasets:
