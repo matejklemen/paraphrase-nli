@@ -191,9 +191,9 @@ if __name__ == "__main__":
                 else:
                     bin_pred = (test_res["pred_proba"][:, test_set.label2idx["entailment"]].numpy() > curr_thresh).astype(np.int32)
 
-                confusion_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
-                plt.matshow(confusion_matrix, cmap="Blues")
-                for (i, j), v in np.ndenumerate(confusion_matrix):
+                conf_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
+                plt.matshow(conf_matrix, cmap="Blues")
+                for (i, j), v in np.ndenumerate(conf_matrix):
                     plt.text(j, i, v, ha='center', va='center',
                              bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
                 plt.xticks(np.arange(len(test_set.label_names)), test_set.label_names)
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                 plt.xlabel("(y_pred)")
 
                 plt.savefig(os.path.join(args.experiment_dir, "confusion_matrix.png"))
-                logging.info(f"Confusion matrix:\n {confusion_matrix}")
+                logging.info(f"Confusion matrix:\n {conf_matrix}")
 
                 model_metrics[f"thresh-{curr_thresh}"] = {
                     "binary_accuracy": accuracy_score(y_true=bin_labels, y_pred=bin_pred),
