@@ -176,6 +176,18 @@ if __name__ == "__main__":
             np_labels = test_set.labels.numpy()
             np_pred = test_res["pred_label"].numpy()
 
+            conf_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
+            plt.matshow(conf_matrix, cmap="Blues")
+            for (i, j), v in np.ndenumerate(conf_matrix):
+                plt.text(j, i, v, ha='center', va='center',
+                         bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
+            plt.xticks(np.arange(len(test_set.label_names)), test_set.label_names)
+            plt.yticks(np.arange(len(test_set.label_names)), test_set.label_names)
+            plt.xlabel("(y_pred)")
+
+            plt.savefig(os.path.join(args.experiment_dir, "confusion_matrix.png"))
+            logging.info(f"Confusion matrix:\n {conf_matrix}")
+
             model_metrics = {
                 "accuracy": accuracy_score(y_true=np_labels, y_pred=np_pred),
                 "macro_precision": precision_score(y_true=np_labels, y_pred=np_pred, average="macro"),
@@ -191,17 +203,17 @@ if __name__ == "__main__":
                 else:
                     bin_pred = (test_res["pred_proba"][:, test_set.label2idx["entailment"]].numpy() > curr_thresh).astype(np.int32)
 
-                conf_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
+                conf_matrix = confusion_matrix(y_true=bin_labels, y_pred=bin_pred)
                 plt.matshow(conf_matrix, cmap="Blues")
                 for (i, j), v in np.ndenumerate(conf_matrix):
                     plt.text(j, i, v, ha='center', va='center',
                              bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
-                plt.xticks(np.arange(len(test_set.label_names)), test_set.label_names)
-                plt.yticks(np.arange(len(test_set.label_names)), test_set.label_names)
+                plt.xticks([0, 1], ["not_ent", "ent"])
+                plt.yticks([0, 1], ["not_ent", "ent"])
                 plt.xlabel("(y_pred)")
 
-                plt.savefig(os.path.join(args.experiment_dir, "confusion_matrix.png"))
-                logging.info(f"Confusion matrix:\n {conf_matrix}")
+                plt.savefig(os.path.join(args.experiment_dir, f"bin_confusion_matrix_{curr_thresh}.png"))
+                logging.info(f"Confusion matrix ({curr_thresh}):\n {conf_matrix}")
 
                 model_metrics[f"thresh-{curr_thresh}"] = {
                     "binary_accuracy": accuracy_score(y_true=bin_labels, y_pred=bin_pred),
