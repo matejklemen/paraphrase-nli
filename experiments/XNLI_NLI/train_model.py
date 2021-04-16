@@ -217,6 +217,8 @@ if __name__ == "__main__":
                                      learning_rate=args.learning_rate,
                                      validate_every_n_steps=args.validate_every_n_examples,
                                      early_stopping_tol=args.early_stopping_rounds,
+                                     class_weights=([1.0, 2.0] if args.binary_task else None),
+                                     optimized_metric=("binary_f1" if args.binary_task else "accuracy"),
                                      device=("cuda" if not args.use_cpu else "cpu"))
 
     trainer.run(train_dataset=train_set, val_dataset=dev_set, num_epochs=args.num_epochs)
