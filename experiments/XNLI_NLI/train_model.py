@@ -27,6 +27,8 @@ parser.add_argument("--pretrained_name_or_path", type=str, default="bert-base-un
 parser.add_argument("--model_type", type=str, default="bert",
                     choices=["bert", "camembert", "roberta", "xlm-roberta", "phobert"])
 
+parser.add_argument("--binary_task", action="store_true",
+                    help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
 parser.add_argument("--custom_train_path", type=str, default=None,
                     help="If set to a path, will load MNLI train set from this path instead of from 'datasets' library")
 parser.add_argument("--custom_dev_path", type=str, default=None,
@@ -83,7 +85,8 @@ if __name__ == "__main__":
     tokenizer.save_pretrained(args.experiment_dir)
 
     train_set = XNLITransformersDataset("en", "train", tokenizer=tokenizer,
-                                        max_length=args.max_seq_len, return_tensors="pt")
+                                        max_length=args.max_seq_len, return_tensors="pt",
+                                        binarize=args.binary_task)
 
     # Override parts with custom (translated) data
     if args.custom_train_path is not None:
@@ -108,17 +111,25 @@ if __name__ == "__main__":
         for k, v in encoded.items():
             setattr(train_set, k, v)
 
+        if args.binary_task:
+            train_set.labels = (train_set.labels == train_set.label2idx["entailment"]).long()
+            train_set.label_names = ["not_entailment", "entailment"]
+            train_set.label2idx = {curr_label: i for i, curr_label in enumerate(train_set.label_names)}
+            train_set.idx2label = {i: curr_label for curr_label, i in train_set.label2idx.items()}
+
         train_set.num_examples = len(train_set.str_premise)
 
     if args.en_validation:
         logging.info(f"Loading English validation set")
         dev_set = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
+                                          max_length=args.max_seq_len, return_tensors="pt",
+                                          binarize=args.binary_task)
     else:
         assert args.lang != "all_languages"
         logging.info(f"Loading validation set in language '{args.lang}'")
         dev_set = XNLITransformersDataset(args.lang, "validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
+                                          max_length=args.max_seq_len, return_tensors="pt",
+                                          binarize=args.binary_task)
         # Override parts with custom (translated) data
         if args.custom_dev_path is not None:
             logging.info(f"Loading custom validation set from '{args.custom_dev_path}'")
@@ -136,17 +147,25 @@ if __name__ == "__main__":
             for k, v in encoded.items():
                 setattr(dev_set, k, v)
 
+            if args.binary_task:
+                dev_set.labels = (dev_set.labels == dev_set.label2idx["entailment"]).long()
+                dev_set.label_names = ["not_entailment", "entailment"]
+                dev_set.label2idx = {curr_label: i for i, curr_label in enumerate(dev_set.label_names)}
+                dev_set.idx2label = {i: curr_label for curr_label, i in dev_set.label2idx.items()}
+
             dev_set.num_examples = len(dev_set.str_premise)
 
     # If evaluating on all languages, we do this in a different way, reloading all languages later on
     loaded_test_lang = args.lang if args.lang != "all_languages" else "en"
     test_set = XNLITransformersDataset(loaded_test_lang, "test", tokenizer=tokenizer,
-                                       max_length=args.max_seq_len, return_tensors="pt")
+                                       max_length=args.max_seq_len, return_tensors="pt",
+                                       binarize=args.binary_task)
     # Override parts with custom (translated) data
     if args.custom_test_path is not None:
         logging.info(f"Loading custom test set from '{args.custom_test_path}'")
         test_set = XNLITransformersDataset(args.lang, "test", tokenizer=tokenizer,
-                                           max_length=args.max_seq_len, return_tensors="pt")
+                                           max_length=args.max_seq_len, return_tensors="pt",
+                                           binarize=args.binary_task)
 
         df_test = pd.read_csv(args.custom_test_path, sep="\t")
         uniq_labels = set(df_test["gold_label"])
@@ -161,6 +180,12 @@ if __name__ == "__main__":
         test_set.labels = torch.tensor(list(map(lambda lbl: test_set.label2idx[lbl], df_test["gold_label"].tolist())))
         for k, v in encoded.items():
             setattr(test_set, k, v)
+
+        if args.binary_task:
+            test_set.labels = (test_set.labels == test_set.label2idx["entailment"]).long()
+            test_set.label_names = ["not_entailment", "entailment"]
+            test_set.label2idx = {curr_label: i for i, curr_label in enumerate(test_set.label_names)}
+            test_set.idx2label = {i: curr_label for curr_label, i in test_set.label2idx.items()}
 
         test_set.num_examples = len(test_set.str_premise)
 
@@ -177,9 +202,6 @@ if __name__ == "__main__":
             setattr(train_set, k, merged)
 
         train_set.num_examples = train_set.num_examples + dev_set.num_examples
-        if args.lang == "all_languages":
-            test_set = XNLITransformersDataset(ALL_LANGS, ["test"] * len(ALL_LANGS), tokenizer=tokenizer,
-                                               max_length=args.max_seq_len, return_tensors="pt")
 
         dev_set = test_set
         test_set = None
