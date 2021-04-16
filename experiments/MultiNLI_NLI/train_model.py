@@ -87,7 +87,8 @@ if __name__ == "__main__":
     if args.test_path is not None:
         # Instantiate dummy set, override with test data (simplification)
         test_set = MultiNLITransformersDataset("validation_matched[:5]", tokenizer=tokenizer,
-                                               max_length=args.max_seq_len, return_tensors="pt")
+                                               max_length=args.max_seq_len, return_tensors="pt",
+                                               binarize=args.binary_task)
 
         df = pd.read_csv(args.test_path, sep="\t")
         # Some values in mismatched test set are NA, set them to some dummy string so submission file has correct rows
@@ -118,7 +119,8 @@ if __name__ == "__main__":
 
         # Instantiate dummy set, override with actual data
         test_set = MultiNLITransformersDataset("validation_matched[:5]", tokenizer=tokenizer,
-                                               max_length=args.max_seq_len, return_tensors="pt")
+                                               max_length=args.max_seq_len, return_tensors="pt",
+                                               binarize=args.binary_task)
 
         # NOTE: order important here! First copy to test set, then fix dev set itself
         for curr_set, curr_indices in [(test_set, test_indices), (dev_set, dev_indices)]:
@@ -138,7 +140,8 @@ if __name__ == "__main__":
 
         # Instantiate dummy set, override with actual data
         test_set = MultiNLITransformersDataset("validation_matched[:5]", tokenizer=tokenizer,
-                                               max_length=args.max_seq_len, return_tensors="pt")
+                                               max_length=args.max_seq_len, return_tensors="pt",
+                                               binarize=args.binary_task)
 
         # NOTE: order important here! First copy to test set, then fix train set itself
         for curr_set, curr_indices in [(test_set, test_indices), (train_set, train_indices)]:
