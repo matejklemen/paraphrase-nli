@@ -235,7 +235,8 @@ if __name__ == "__main__":
 
     for curr_handle in dev_set_handles:
         dev_set = XNLITransformersDataset(curr_handle, "validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt")
+                                          max_length=args.max_seq_len, return_tensors="pt",
+                                          binarize=args.binary_task)
         dev_res = trainer.evaluate(dev_set)
 
         np_labels = dev_set.labels.numpy()
@@ -270,7 +271,8 @@ if __name__ == "__main__":
             curr_test_set = XNLITransformersDataset(curr_handle, "test",
                                                     tokenizer=tokenizer,
                                                     max_length=args.max_seq_len,
-                                                    return_tensors="pt")
+                                                    return_tensors="pt",
+                                                    binarize=args.binary_task)
             logging.info(f"Language '{curr_handle}':")
             test_res = trainer.evaluate(curr_test_set)
 
