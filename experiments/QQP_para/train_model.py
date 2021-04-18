@@ -33,7 +33,7 @@ parser.add_argument("--learning_rate", type=float, default=2e-5)
 parser.add_argument("--early_stopping_rounds", type=int, default=5)
 parser.add_argument("--validate_every_n_examples", type=int, default=100)
 
-parser.add_argument("--use_cpu", action="store_true", default=True)
+parser.add_argument("--use_cpu", action="store_true")
 
 
 if __name__ == "__main__":
