@@ -107,15 +107,17 @@ if __name__ == "__main__":
                                               truncation="longest_first", return_tensors="pt")
         train_set.str_premise = df["premise"].tolist()
         train_set.str_hypothesis = df["hypo"].tolist()
-        train_set.labels = torch.tensor(list(map(lambda lbl: train_set.label2idx[lbl], df["label"].tolist())))
-        for k, v in encoded.items():
-            setattr(train_set, k, v)
-
         if args.binary_task:
-            train_set.labels = (train_set.labels == train_set.label2idx["entailment"]).long()
+            _mapping = {"entailment": 1, "neutral": 0, "contradiction": 0}
             train_set.label_names = ["not_entailment", "entailment"]
             train_set.label2idx = {curr_label: i for i, curr_label in enumerate(train_set.label_names)}
             train_set.idx2label = {i: curr_label for curr_label, i in train_set.label2idx.items()}
+        else:
+            _mapping = {"entailment": 0, "neutral": 1, "contradiction": 2}
+
+        train_set.labels = torch.tensor(list(map(lambda lbl: _mapping[lbl], df["label"].tolist())))
+        for k, v in encoded.items():
+            setattr(train_set, k, v)
 
         train_set.num_examples = len(train_set.str_premise)
 
@@ -143,15 +145,17 @@ if __name__ == "__main__":
                                                   truncation="longest_first", return_tensors="pt")
             dev_set.str_premise = df_dev["sentence1"].tolist()
             dev_set.str_hypothesis = df_dev["sentence2"].tolist()
-            dev_set.labels = torch.tensor(list(map(lambda lbl: dev_set.label2idx[lbl], df_dev["gold_label"].tolist())))
-            for k, v in encoded.items():
-                setattr(dev_set, k, v)
-
             if args.binary_task:
-                dev_set.labels = (dev_set.labels == dev_set.label2idx["entailment"]).long()
+                _mapping = {"entailment": 1, "neutral": 0, "contradiction": 0}
                 dev_set.label_names = ["not_entailment", "entailment"]
                 dev_set.label2idx = {curr_label: i for i, curr_label in enumerate(dev_set.label_names)}
                 dev_set.idx2label = {i: curr_label for curr_label, i in dev_set.label2idx.items()}
+            else:
+                _mapping = {"entailment": 0, "neutral": 1, "contradiction": 2}
+
+            dev_set.labels = torch.tensor(list(map(lambda lbl: _mapping[lbl], df_dev["label"].tolist())))
+            for k, v in encoded.items():
+                setattr(dev_set, k, v)
 
             dev_set.num_examples = len(dev_set.str_premise)
 
@@ -177,15 +181,17 @@ if __name__ == "__main__":
                                               truncation="longest_first", return_tensors="pt")
         test_set.str_premise = df_test["sentence1"].tolist()
         test_set.str_hypothesis = df_test["sentence2"].tolist()
-        test_set.labels = torch.tensor(list(map(lambda lbl: test_set.label2idx[lbl], df_test["gold_label"].tolist())))
-        for k, v in encoded.items():
-            setattr(test_set, k, v)
-
         if args.binary_task:
-            test_set.labels = (test_set.labels == test_set.label2idx["entailment"]).long()
+            _mapping = {"entailment": 1, "neutral": 0, "contradiction": 0}
             test_set.label_names = ["not_entailment", "entailment"]
             test_set.label2idx = {curr_label: i for i, curr_label in enumerate(test_set.label_names)}
             test_set.idx2label = {i: curr_label for curr_label, i in test_set.label2idx.items()}
+        else:
+            _mapping = {"entailment": 0, "neutral": 1, "contradiction": 2}
+
+        test_set.labels = torch.tensor(list(map(lambda lbl: _mapping[lbl], df_test["gold_label"].tolist())))
+        for k, v in encoded.items():
+            setattr(test_set, k, v)
 
         test_set.num_examples = len(test_set.str_premise)
 
