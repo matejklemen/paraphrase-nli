@@ -113,6 +113,9 @@ if __name__ == "__main__":
                                                    batch_size=args.batch_size)
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
 
+    if args.binary_task:
+        assert model.num_labels == 2
+
     model_metrics = {}
 
     all_paras = {

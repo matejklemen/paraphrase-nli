@@ -119,6 +119,9 @@ if __name__ == "__main__":
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
+    if args.binary_task:
+        assert model.num_labels == 2
+
     if args.lang == "all_languages":
         processed_datasets = [(curr_lang, curr_split) for curr_lang in ALL_LANGS for curr_split in ["validation", "test"]]
     else:
