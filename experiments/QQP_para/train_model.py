@@ -20,7 +20,8 @@ parser.add_argument("--pretrained_name_or_path", type=str, default="roberta-base
 parser.add_argument("--model_type", type=str, default="roberta",
                     choices=["bert", "roberta", "xlm-roberta"])
 
-parser.add_argument("--create_test_from_validation", action="store_true", default=True,
+parser.add_argument("--reverse_order", action="store_true")
+parser.add_argument("--create_test_from_validation", action="store_true",
                     help="If set, split the validation set in half and use one half as a test set substitute")
 
 parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/qqp/train.tsv")
@@ -71,9 +72,11 @@ if __name__ == "__main__":
     tokenizer.save_pretrained(args.experiment_dir)
 
     train_set = QQPTransformersDataset(args.train_path, tokenizer=tokenizer,
-                                       max_length=args.max_seq_len, return_tensors="pt")
+                                       max_length=args.max_seq_len, return_tensors="pt",
+                                       reverse_order=args.reverse_order)
     dev_set = QQPTransformersDataset(args.dev_path, tokenizer=tokenizer,
-                                     max_length=args.max_seq_len, return_tensors="pt")
+                                     max_length=args.max_seq_len, return_tensors="pt",
+                                     reverse_order=args.reverse_order)
 
     test_set = None
     if args.create_test_from_validation:

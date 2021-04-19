@@ -24,6 +24,8 @@ parser.add_argument("--max_seq_len", type=int, default=55)
 parser.add_argument("--batch_size", type=int, default=16,
                     help="Evaluation batch size. Note that this can generally be set much higher than in training mode")
 
+parser.add_argument("--reverse_order", action="store_true")
+
 parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/qqp/train.tsv")
 parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/qqp/dev.tsv")
 
@@ -123,7 +125,8 @@ if __name__ == "__main__":
     t1 = time()
     for dataset_name, data_path in [("train", args.train_path), ("dev", args.dev_path)]:
         dataset = QQPTransformersDataset(data_path, tokenizer=tokenizer,
-                                         max_length=args.max_seq_len, return_tensors="pt")
+                                         max_length=args.max_seq_len, return_tensors="pt",
+                                         reverse_order=args.reverse_order)
 
         logging.info(f"{dataset_name}: loaded {len(dataset)} examples")
         l2r_preds = {

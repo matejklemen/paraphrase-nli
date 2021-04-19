@@ -11,7 +11,8 @@ from src.data.nli import TransformersSeqPairDataset
 
 class QQPTransformersDataset(TransformersSeqPairDataset):
     def __init__(self, path: Union[str, Iterable[str]], tokenizer,
-                 max_length: Optional[int] = None, return_tensors: Optional[str] = None):
+                 max_length: Optional[int] = None, return_tensors: Optional[str] = None,
+                 reverse_order: Optional[bool] = False):
         _path = (path,) if isinstance(path, str) else path
 
         self.pair_id = []
@@ -50,6 +51,10 @@ class QQPTransformersDataset(TransformersSeqPairDataset):
                     valid_label.append(int(fields[-1]))
 
             logging.info(f"'{curr_path}': skipped {num_errs} rows due to formatting errors")
+
+        if reverse_order:
+            self.qid1, self.qid2 = self.qid2, self.qid1
+            self.seq1, self.seq2 = self.seq2, self.seq1
 
         self.label_names = ["not_paraphrase", "paraphrase"]
         self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
