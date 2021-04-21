@@ -1,5 +1,6 @@
 import csv
 import logging
+from collections import Counter
 from io import StringIO
 from typing import Union, Iterable, Optional
 from warnings import warn
@@ -88,7 +89,7 @@ class QQPTransformersDataset(TransformersSeqPairDataset):
 class MRPCTransformersDataset(TransformersSeqPairDataset):
     def __init__(self, path: Union[str, Iterable[str]], tokenizer,
                  max_length: Optional[int] = None, return_tensors: Optional[str] = None,
-                 reverse_order: Optional[bool] = False):
+                 reverse_order: Optional[bool] = False, balance: Optional[bool] = False):
         _path = (path,) if isinstance(path, str) else path
 
         self.sid1 = []
@@ -122,6 +123,32 @@ class MRPCTransformersDataset(TransformersSeqPairDataset):
 
             logging.info(f"'{curr_path}': skipped {num_errs} rows due to formatting errors")
 
+        # Sanity check: expecting binary task
+        assert len(set(valid_label)) == 2
+
+        if balance:
+            label_count = Counter(valid_label)
+            assert label_count[1] > label_count[0]
+
+            _valid_label = torch.tensor(valid_label)
+            # Keep all examples except those corresponding to excess positive labels
+            keep_mask = torch.ones_like(_valid_label, dtype=torch.bool)
+            positive_indices = torch.flatten(torch.nonzero(_valid_label, as_tuple=False))
+            positive_indices = positive_indices[torch.randperm(positive_indices.shape[0])]
+            keep_mask[positive_indices[label_count[0]:]] = False
+
+            keep_indices = torch.flatten(torch.nonzero(keep_mask, as_tuple=False)).tolist()
+            self.sid1 = [self.sid1[_i] for _i in keep_indices]
+            self.sid2 = [self.sid2[_i] for _i in keep_indices]
+
+            self.seq1 = [self.seq1[_i] for _i in keep_indices]
+            self.seq2 = [self.seq2[_i] for _i in keep_indices]
+
+            valid_label = [valid_label[_i] for _i in keep_indices]
+            logging.info(f"Balancing dataset:\n"
+                         f"\t Before: {label_count}\n"
+                         f"\t After: {Counter(valid_label)}")
+
         if reverse_order:
             self.sid1, self.sid2 = self.sid2, self.sid1
             self.seq1, self.seq2 = self.seq2, self.seq1
@@ -129,9 +156,6 @@ class MRPCTransformersDataset(TransformersSeqPairDataset):
         self.label_names = ["not_paraphrase", "paraphrase"]
         self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
         self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
-
-        # Sanity check: expecting binary task
-        assert len(set(valid_label)) == 2
 
         optional_kwargs = {}
         if return_tensors is not None:
