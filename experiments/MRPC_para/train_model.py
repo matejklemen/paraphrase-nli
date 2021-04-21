@@ -24,6 +24,8 @@ parser.add_argument("--balance", action="store_true")
 parser.add_argument("--reverse_order", action="store_true")
 parser.add_argument("--create_dev_from_training", action="store_true",
                     help="If set, split the training set use one half as a test set substitute")
+parser.add_argument("--optimized_metric", default="binary_f1",
+                    choices=["loss", "accuracy", "binary_f1"])
 
 parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/mrpc/msr_paraphrase_train.txt")
 parser.add_argument("--test_path", type=str, default="/home/matej/Documents/data/mrpc/msr_paraphrase_test.txt")
@@ -112,7 +114,7 @@ if __name__ == "__main__":
                                      validate_every_n_steps=args.validate_every_n_examples,
                                      early_stopping_tol=args.early_stopping_rounds,
                                      class_weights=(None if args.balance else [2.0, 1.0]),
-                                     optimized_metric="binary_f1",
+                                     optimized_metric=args.optimized_metric,
                                      device=("cuda" if not args.use_cpu else "cpu"))
 
     trainer.run(train_dataset=train_set, val_dataset=dev_set, num_epochs=args.num_epochs)
