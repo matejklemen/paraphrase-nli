@@ -25,8 +25,6 @@ parser.add_argument("--binary_task", action="store_true",
                     help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
 parser.add_argument("--create_test_from_validation", action="store_true",
                     help="If set, split the validation set in half and use one half as a test set substitute")
-parser.add_argument("--create_test_from_train", action="store_true",
-                    help="If set, remove 10k examples from training set and use them as test set")
 
 parser.add_argument("--test_path", type=str, default=None)
 parser.add_argument("--mode", choices=["matched", "mismatched"], default="matched")
@@ -109,10 +107,8 @@ if __name__ == "__main__":
         delattr(test_set, "labels")
         test_set.valid_attrs.remove("labels")
 
-    if args.create_test_from_validation and args.create_test_from_train:
-        raise ValueError(f"Only one of --create_test_from_validation and --create_test_from_train can be set at a time")
-
     if args.create_test_from_validation:
+        logging.info("Dividing validation set into two parts and using one as test set")
         indices = torch.randperm(len(dev_set)).tolist()
         dev_indices = indices[: int(0.5 * len(indices))]
         test_indices = indices[int(0.5 * len(indices)):]
@@ -131,27 +127,6 @@ if __name__ == "__main__":
 
             for attr in dev_set.valid_attrs:
                 setattr(curr_set, attr, getattr(dev_set, attr)[curr_indices])
-
-            curr_set.num_examples = len(curr_set.str_premise)
-    elif args.create_test_from_train:
-        indices = torch.randperm(len(train_set)).tolist()
-        train_indices = indices[: -10_000]
-        test_indices = indices[-10_000:]
-
-        # Instantiate dummy set, override with actual data
-        test_set = MultiNLITransformersDataset("validation_matched[:5]", tokenizer=tokenizer,
-                                               max_length=args.max_seq_len, return_tensors="pt",
-                                               binarize=args.binary_task)
-
-        # NOTE: order important here! First copy to test set, then fix train set itself
-        for curr_set, curr_indices in [(test_set, test_indices), (train_set, train_indices)]:
-            curr_set.str_premise = [train_set.str_premise[_i] for _i in curr_indices]
-            curr_set.str_hypothesis = [train_set.str_hypothesis[_i] for _i in curr_indices]
-            curr_set.genre = [train_set.genre[_i] for _i in curr_indices]
-            curr_set.pair_ids = [train_set.pair_ids[_i] for _i in curr_indices]
-
-            for attr in train_set.valid_attrs:
-                setattr(curr_set, attr, getattr(train_set, attr)[curr_indices])
 
             curr_set.num_examples = len(curr_set.str_premise)
 
@@ -226,7 +201,6 @@ if __name__ == "__main__":
                 }
 
             with open(os.path.join(args.experiment_dir, "metrics.json"), "w") as f_metrics:
-                logging.info(model_metrics)
                 json.dump(model_metrics, fp=f_metrics, indent=4)
 
             logging.info(model_metrics)
