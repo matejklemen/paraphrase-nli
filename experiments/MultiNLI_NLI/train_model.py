@@ -27,7 +27,6 @@ parser.add_argument("--create_test_from_validation", action="store_true",
                     help="If set, split the validation set in half and use one half as a test set substitute")
 
 parser.add_argument("--test_path", type=str, default=None)
-parser.add_argument("--mode", choices=["matched", "mismatched"], default="matched")
 
 parser.add_argument("--num_epochs", type=int, default=2)
 parser.add_argument("--max_seq_len", type=int, default=41)
