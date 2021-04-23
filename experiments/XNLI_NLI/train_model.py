@@ -35,7 +35,6 @@ parser.add_argument("--custom_dev_path", type=str, default=None,
                     help="If set to a path, will load MNLI dev set from this path instead of from 'datasets' library")
 parser.add_argument("--custom_test_path", type=str, default=None,
                     help="If set to a path, will load MNLI test set from this path instead of from 'datasets' library")
-parser.add_argument("--combine_train_dev", action="store_true")
 
 parser.add_argument("--num_epochs", type=int, default=3)
 parser.add_argument("--max_seq_len", type=int, default=41)
@@ -153,13 +152,13 @@ if __name__ == "__main__":
             else:
                 _mapping = {"entailment": 0, "neutral": 1, "contradiction": 2}
 
-            dev_set.labels = torch.tensor(list(map(lambda lbl: _mapping[lbl], df_dev["label"].tolist())))
+            dev_set.labels = torch.tensor(list(map(lambda lbl: _mapping[lbl], df_dev["gold_label"].tolist())))
             for k, v in encoded.items():
                 setattr(dev_set, k, v)
 
             dev_set.num_examples = len(dev_set.str_premise)
 
-    # If evaluating on all languages, we do this in a different way, reloading all languages later on
+    # If evaluating on all_languages, handle this in a different way, reloading languages one at a time later on
     loaded_test_lang = args.lang if args.lang != "all_languages" else "en"
     test_set = XNLITransformersDataset(loaded_test_lang, "test", tokenizer=tokenizer,
                                        max_length=args.max_seq_len, return_tensors="pt",
@@ -195,23 +194,6 @@ if __name__ == "__main__":
 
         test_set.num_examples = len(test_set.str_premise)
 
-    if args.combine_train_dev:
-        train_set.str_premise = train_set.str_premise + dev_set.str_premise
-        train_set.str_hypothesis = train_set.str_hypothesis + dev_set.str_hypothesis
-
-        for k in train_set.valid_attrs:
-            train_k = getattr(train_set, k)
-            dev_k = getattr(dev_set, k)
-            merged = torch.cat((train_k, dev_k))
-            logging.info(f"Merging together '{k}' for training ({train_k.shape}) and dev set ({dev_k.shape}): "
-                         f"merged shape = {merged.shape}")
-            setattr(train_set, k, merged)
-
-        train_set.num_examples = train_set.num_examples + dev_set.num_examples
-
-        dev_set = test_set
-        test_set = None
-
     logging.info(f"Loaded {len(train_set)} training examples, "
                  f"{len(dev_set)} dev examples and "
                  f"{len(test_set) if test_set is not None else 0} test examples")
@@ -236,13 +218,19 @@ if __name__ == "__main__":
         dev_set_handles = list(ALL_LANGS)
         test_set_handles = list(ALL_LANGS)
     else:
-        dev_set_handles = [args.lang]
-        test_set_handles = [args.lang]
+        # If using custom dev/test (translated) datasets, the datasets are already loaded
+        # Otherwise, store the handle and load them later
+        dev_set_handles = [(args.lang, dev_set) if args.custom_dev_path is None else args.lang]
+        test_set_handles = [(args.lang, test_set) if args.custom_test_path is None else args.lang]
 
-    for curr_handle in dev_set_handles:
-        dev_set = XNLITransformersDataset(curr_handle, "validation", tokenizer=tokenizer,
-                                          max_length=args.max_seq_len, return_tensors="pt",
-                                          binarize=args.binary_task)
+    for curr_handle_or_dataset in dev_set_handles:
+        if isinstance(curr_handle_or_dataset, tuple):
+            curr_handle, dev_set = curr_handle_or_dataset
+        else:
+            curr_handle = curr_handle_or_dataset  # type: str
+            dev_set = XNLITransformersDataset(curr_handle, "validation", tokenizer=tokenizer,
+                                              max_length=args.max_seq_len, return_tensors="pt",
+                                              binarize=args.binary_task)
         dev_res = trainer.evaluate(dev_set)
 
         np_labels = dev_set.labels.numpy()
@@ -273,12 +261,15 @@ if __name__ == "__main__":
         logging.info(f"[Dev set, {curr_handle}]\n {model_metrics}")
 
     if test_set is not None:
-        for curr_handle in test_set_handles:
-            curr_test_set = XNLITransformersDataset(curr_handle, "test",
-                                                    tokenizer=tokenizer,
-                                                    max_length=args.max_seq_len,
-                                                    return_tensors="pt",
-                                                    binarize=args.binary_task)
+        for curr_handle_or_dataset in test_set_handles:
+            if isinstance(curr_handle_or_dataset, tuple):
+                curr_handle, curr_test_set = curr_handle_or_dataset
+            else:
+                curr_handle = curr_handle_or_dataset  # type: str
+                curr_test_set = XNLITransformersDataset(curr_handle, "test", tokenizer=tokenizer,
+                                                        max_length=args.max_seq_len, return_tensors="pt",
+                                                        binarize=args.binary_task)
+
             logging.info(f"Language '{curr_handle}':")
             test_res = trainer.evaluate(curr_test_set)
 
