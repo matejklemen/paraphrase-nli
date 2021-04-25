@@ -74,7 +74,7 @@ def read_qqp(file_path):
 
 class DecomposablePairModel(nn.Module):
     def __init__(self, transformers_handle, label_embedding_size: int = 50, num_labels: int = 2,
-                 fc_hidden_size: int = 10, class_weights: Optional[List] = None):
+                 fc_hidden_size: int = 10, class_weights: Optional = None):
         super().__init__()
 
         self.model = AutoModelForSequenceClassification.from_pretrained(transformers_handle, return_dict=True,
@@ -88,7 +88,7 @@ class DecomposablePairModel(nn.Module):
             nn.Linear(in_features=fc_hidden_size, out_features=num_labels)
         )
 
-        self.class_weights = torch.tensor(class_weights) if class_weights is not None else None
+        self.class_weights = class_weights
         self.num_labels = num_labels
 
     def forward(self, forward_ids, backward_ids, **modeling_kwargs):
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     model = DecomposablePairModel(transformers_handle=args.pretrained_name_or_path,
                                   label_embedding_size=args.label_embedding_size,
                                   fc_hidden_size=args.fc_hidden_size,
-                                  class_weights=[1.0, 2.0],
+                                  class_weights=torch.tensor([1.0, 2.0], device=DEVICE),
                                   num_labels=len(set(train_data["label"]))).to(DEVICE)
     optimizer = optim.AdamW(params=model.parameters(), lr=args.learning_rate)
     VALIDATE_EVERY_N_STEPS = args.validate_every_n_steps
