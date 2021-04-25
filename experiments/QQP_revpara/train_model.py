@@ -263,11 +263,11 @@ if __name__ == "__main__":
                 else:
                     no_increase += 1
 
-                if no_increase == args.early_stopping_rounds:
-                    break
-
             if no_increase == args.early_stopping_rounds:
                 break
+
+        if no_increase == args.early_stopping_rounds:
+            break
 
     logging.info("Evaluating model on test set!")
     model.load_state_dict(torch.load(os.path.join(args.experiment_dir, "weights.th"),
