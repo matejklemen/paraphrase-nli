@@ -220,8 +220,8 @@ if __name__ == "__main__":
     else:
         # If using custom dev/test (translated) datasets, the datasets are already loaded
         # Otherwise, store the handle and load them later
-        dev_set_handles = [(args.lang, dev_set) if args.custom_dev_path is None else args.lang]
-        test_set_handles = [(args.lang, test_set) if args.custom_test_path is None else args.lang]
+        dev_set_handles = [(args.lang, dev_set) if args.custom_dev_path is not None else args.lang]
+        test_set_handles = [(args.lang, test_set) if args.custom_test_path is not None else args.lang]
 
     for curr_handle_or_dataset in dev_set_handles:
         if isinstance(curr_handle_or_dataset, tuple):
