@@ -199,7 +199,7 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
                                                        return_tensors="pt")
         new_encoded["labels"] = torch.tensor(new_labels)
 
-        assert all(attr_name in new_encoded for attr_name in dataset.valid_attrs)
+        assert all(attr_name in new_encoded for attr_name in self.valid_attrs)
         self.num_examples = len(new_seq1)
         for attr, values in new_encoded.items():
             setattr(self, attr, values)
