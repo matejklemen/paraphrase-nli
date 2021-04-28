@@ -136,6 +136,7 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
                  custom_label_names: Optional[List[str]] = None, binarize: Optional[bool] = False):
         _lang = (lang,) if isinstance(lang, str) else lang
         _split = (split,) if isinstance(split, str) else split
+        self.tokenizer = tokenizer
 
         datasets_list = [datasets.load_dataset("xnli", curr_lang, split=curr_split)
                          for curr_lang, curr_split in zip(_lang, _split)]
@@ -163,12 +164,14 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
             valid_label = torch.tensor(valid_label)
             optional_kwargs["return_tensors"] = "pt"
 
+        self.max_length = None
         if max_length is not None:
+            self.max_length = max_length
             optional_kwargs["max_length"] = max_length
             optional_kwargs["padding"] = "max_length"
             optional_kwargs["truncation"] = "longest_first"
 
-        encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
+        encoded = self.tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
         encoded["labels"] = valid_label
 
         if binarize:
@@ -178,6 +181,28 @@ class XNLITransformersDataset(TransformersSeqPairDataset):
             self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
 
         super().__init__(**encoded)
+
+    def override_data(self, new_seq1: List[str], new_seq2: List[str], new_labels: List[int],
+                      new_label_set: List[str] = None):
+        assert self.max_length is not None
+        assert len(new_seq1) == len(new_seq2) == len(new_labels)
+
+        if new_label_set is not None:
+            self.label_names = new_label_set
+            self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
+            self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
+
+        self.str_premise = new_seq1
+        self.str_hypothesis = new_seq2
+        new_encoded = self.tokenizer.batch_encode_plus(list(zip(new_seq1, new_seq2)), max_length=self.max_length,
+                                                       padding="max_length", truncation="longest_first",
+                                                       return_tensors="pt")
+        new_encoded["labels"] = torch.tensor(new_labels)
+
+        assert all(attr_name in new_encoded for attr_name in dataset.valid_attrs)
+        self.num_examples = len(new_seq1)
+        for attr, values in new_encoded.items():
+            setattr(self, attr, values)
 
 
 class RTETransformersDataset(TransformersSeqPairDataset):
@@ -218,6 +243,19 @@ class RTETransformersDataset(TransformersSeqPairDataset):
 if __name__ == "__main__":
     from transformers import BertTokenizerFast, RobertaTokenizerFast
     tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-    dataset = MultiNLITransformersDataset(("validation_matched", "validation_mismatched"), tokenizer=tokenizer)
+    dataset = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
+                                      max_length=40, return_tensors="pt")
 
+    print("Before:")
     print(len(dataset))
+
+    df = pd.read_csv("/home/matej/Documents/data/XNLI-MT/xnli/xnli.test.en.tsv", sep="\t")
+    dataset.override_data(df["sentence1"].tolist(), df["sentence2"].tolist(),
+                          new_labels=df["gold_label"].apply(lambda str_label: dataset.label2idx[str_label]))
+
+    print("After:")
+    print(len(dataset))
+
+    print(dataset.valid_attrs)
+    for k in dataset.valid_attrs:
+        print(len(getattr(dataset, k)))

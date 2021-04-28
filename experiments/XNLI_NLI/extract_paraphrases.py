@@ -11,7 +11,7 @@ import torch
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, AutoTokenizer, \
     CamembertTokenizerFast
 
-from src.data.nli import MultiNLITransformersDataset, XNLITransformersDataset
+from src.data.nli import XNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
 from src.visualization.visualize import multicolumn_visualization
 
@@ -21,13 +21,22 @@ parser.add_argument("--experiment_dir", type=str, default="debug_extraction")
 parser.add_argument("--pretrained_name_or_path", type=str,
                     default="/home/matej/Documents/embeddia/paraphrasing/nli2paraphrases/models/XNLI_NLI/ar/xnli-ar-bert-base-arabic-2e-5-maxlength92")
 parser.add_argument("--model_type", type=str, default="bert",
-                    choices=["bert", "roberta", "camembert", "xlm-roberta"])
+                    choices=["bert", "roberta", "camembert", "xlm-roberta", "phobert"])
 parser.add_argument("--max_seq_len", type=int, default=98)
 parser.add_argument("--batch_size", type=int, default=16,
                     help="Evaluation batch size. Note that this can generally be set much higher than in training mode")
 
 parser.add_argument("--binary_task", action="store_true",
                     help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
+
+parser.add_argument("--only_train_set", action="store_true",
+                    help="If set, extract paraphrases from training set, otherwise extract them from validation and "
+                         "test set")
+
+parser.add_argument("--custom_dev_path", type=str, default=None,
+                    help="If set to a path, will load XNLI dev set from this path instead of from 'datasets' library")
+parser.add_argument("--custom_test_path", type=str, default=None,
+                    help="If set to a path, will load XNLI test set from this path instead of from 'datasets' library")
 
 parser.add_argument("--l2r_strategy", choices=["ground_truth", "argmax", "thresh"], default="ground_truth")
 parser.add_argument("--r2l_strategy", choices=["argmax", "thresh"], default="argmax")
@@ -123,30 +132,83 @@ if __name__ == "__main__":
         assert model.num_labels == 2
 
     if args.lang == "all_languages":
-        processed_datasets = [(curr_lang, curr_split) for curr_lang in ALL_LANGS for curr_split in ["validation", "test"]]
+        if args.custom_dev_path is not None and args.custom_test_path is not None:
+            df_dev = pd.read_csv(args.custom_dev_path, sep="\t")
+            df_test = pd.read_csv(args.custom_test_path, sep="\t")
+            datasets_to_process = []
+
+            # A bit of a hack hardcoding this, so we assert that binary task is not being done
+            assert not args.binary_task
+            label_map = {"entailment": 0, "neutral": 1, "contradiction": 2}
+
+            for curr_dev_lang, curr_dev_group in df_dev.groupby("language"):
+                datasets_to_process.append({
+                    "lang": curr_dev_lang,
+                    "split": "validation",
+                    "override_data": {
+                        "sentence1": curr_dev_group["sentence1"].tolist(),
+                        "sentence2": curr_dev_group["sentence2"].tolist(),
+                        "label": curr_dev_group["gold_label"].apply(lambda label_str: label_map[label_str]).tolist()
+                    }
+                })
+
+            for curr_test_lang, curr_test_group in df_test.groupby("language"):
+                datasets_to_process.append({
+                    "lang": curr_test_lang,
+                    "split": "test",
+                    "override_data": {
+                        "sentence1": curr_test_group["sentence1"].tolist(),
+                        "sentence2": curr_test_group["sentence2"].tolist(),
+                        "label": curr_test_group["gold_label"].apply(lambda label_str: label_map[label_str]).tolist()
+                    }
+                })
+        else:
+            datasets_to_process = [{
+                "lang": curr_lang,
+                "split": curr_split
+            } for curr_lang in ALL_LANGS for curr_split in ["validation", "test"]]
     else:
-        processed_datasets = [
-            (f"{args.lang}_{curr_split}",
-             XNLITransformersDataset(args.lang, curr_split, tokenizer=tokenizer,
-                                     max_length=args.max_seq_len, return_tensors="pt",
-                                     binarize=args.binary_task))
-            for curr_split in ["validation", "test"]
-        ]
+        if args.only_train_set:
+            logging.info("Note: only processing train set!")
+            datasets_to_process = [{
+                "lang": args.lang,
+                "split": "train",
+                "preloaded_dataset": XNLITransformersDataset(args.lang, "train", tokenizer=tokenizer,
+                                                             max_length=args.max_seq_len, return_tensors="pt",
+                                                             binarize=args.binary_task)
+            }]
+        else:
+            logging.info("Note: only processing validation and test set!")
+            datasets_to_process = [{
+                "lang": args.lang,
+                "split": curr_split,
+                "preloaded_dataset": XNLITransformersDataset(args.lang, curr_split, tokenizer=tokenizer,
+                                                             max_length=args.max_seq_len, return_tensors="pt",
+                                                             binarize=args.binary_task)
+            } for curr_split in ["validation", "test"]]
 
     model_metrics = {}
 
     t1 = time()
-    for curr_handle_or_obj in processed_datasets:
-        if isinstance(curr_handle_or_obj[1], XNLITransformersDataset):
-            dataset_name, dataset = curr_handle_or_obj
+    for curr_dataset_metadata in datasets_to_process:
+        lang, split = curr_dataset_metadata["lang"], curr_dataset_metadata["split"]
+        dataset_name = f"{lang}_{split}"
+        if "preloaded_dataset" in curr_dataset_metadata:
+            dataset = curr_dataset_metadata["preloaded_dataset"]
+            logging.info(f"'{dataset_name}': Using pre-loaded dataset with {len(dataset)} examples")
         else:
-            lang, split = curr_handle_or_obj
-            dataset_name = f"{lang}_{split}"
             dataset = XNLITransformersDataset(lang, split, tokenizer=tokenizer,
                                               max_length=args.max_seq_len, return_tensors="pt",
                                               binarize=args.binary_task)
+            if "override_data" in curr_dataset_metadata:
+                dataset_name = f"{lang}_{split}_custom"
+                dataset.override_data(new_seq1=curr_dataset_metadata["override_data"]["sentence1"],
+                                      new_seq2=curr_dataset_metadata["override_data"]["sentence2"],
+                                      new_labels=curr_dataset_metadata["override_data"]["label"])
+                logging.info(f"'{dataset_name}': Using overriden dataset with {len(dataset)} examples")
+            else:
+                logging.info(f"'{dataset_name}': Using loaded regular dataset with {len(dataset)} examples")
 
-        logging.info(f"'{dataset_name}': Processing dataset with {len(dataset)} examples")
         l2r_preds = {
             "premise": dataset.str_premise,
             "hypothesis": dataset.str_hypothesis
