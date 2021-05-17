@@ -1,55 +1,73 @@
 nli2paraphrases
 ==============================
 
-Bridging natural language inference and paraphrasing.
+Source code repository accompanying the paper `Extracting and filtering paraphrases by bridging natural language 
+inference and paraphrasing`.
+
+Setup
+-----
+```shell
+# Make sure to run this from the root of the project (top-level directory)
+$ pip3 install -r requirements.txt
+$ python3 setup.py install
+```
 
 Project Organization
 ------------
 
-    ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
+    ├── README.md          
+    ├── experiments        <- Experiment scripts, through which training and extraction is done
+    ├── models             <- Intended for storing fine-tuned models and configs
+    ├── requirements.txt   
+    ├── setup.py           
+    ├── src                <- Core source code for this project
+    │   ├── __init__.py    
+    │   ├── data           <- data loading scripts
+    │   ├── models         <- general scripts for training/using a NLI model
+    │   └── visualization  <- visualization scripts for obtaining a nicer view of extracted paraphrases
+
+
+Getting started
+----------------
+As an example, let us extract paraphrases from **SNLI**.
+
+The training and extraction process largely follows the same track for other datasets (with some new or removed 
+flags, run scripts with `--help` flag to see the specifics).
+
+In the example, we first fine-tune a `roberta-base` NLI model on SNLI sequences (s1, s2).  
+Then, we use the fine-tuned model to predict the reverse relation for entailment examples, and select only those 
+examples for which entailment holds in both directions.
+The extracted paraphrases are stored into `extract-argmax`.
+
+This example assumes that you have access to a GPU. If not, you can force the scripts to use CPU by setting `--use_cpu`, 
+although the whole process will be much slower.  
+
+```shell
+# Assuming the current position is in the root directory of the project
+$ cd experiments/SNLI_NLI
+
+# Training takes ~1hr30mins on Colab GPU (K80)
+$ python3 train_model.py \
+--experiment_dir="../models/SNLI_NLI/snli-roberta-base-maxlen42-2e-5" \
+--pretrained_name_or_path="roberta-base" \
+--model_type="roberta" \
+--num_epochs=10 \
+--max_seq_len=42 \
+--batch_size=256 \
+--learning_rate=2e-5 \
+--early_stopping_rounds=5 \
+--validate_every_n_examples=5000
+
+# Extraction takes ~15mins on Colab GPU (K80)
+$ python3 extract_paraphrases.py \
+--experiment_dir="extract-argmax" \
+--pretrained_name_or_path="../models/SNLI_NLI/snli-roberta-base-maxlen42-2e-5" \
+--model_type="roberta" \
+--max_seq_len=42 \
+--batch_size=1024 \
+--l2r_strategy="ground_truth" \
+--r2l_strategy="argmax"
+```
 
 
 --------
