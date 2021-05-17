@@ -16,8 +16,7 @@ from src.visualization.visualize import multicolumn_visualization
 
 parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug_extraction")
-parser.add_argument("--pretrained_name_or_path", type=str,
-                    default="/home/matej/Documents/embeddia/paraphrasing/nli2paraphrases/models/MultiNLI_NLI/matched/mnli-matched-roberta-base-2e-5-maxlength98")
+parser.add_argument("--pretrained_name_or_path", type=str)
 parser.add_argument("--model_type", type=str, default="roberta",
                     choices=["bert", "roberta", "xlm-roberta"])
 parser.add_argument("--max_seq_len", type=int, default=98)

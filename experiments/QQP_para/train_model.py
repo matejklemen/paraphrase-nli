@@ -24,8 +24,8 @@ parser.add_argument("--reverse_order", action="store_true")
 parser.add_argument("--create_test_from_validation", action="store_true",
                     help="If set, split the validation set in half and use one half as a test set substitute")
 
-parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/qqp/train.tsv")
-parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/qqp/dev.tsv")
+parser.add_argument("--train_path", type=str, help="Path to the training set of QQP (tsv)")
+parser.add_argument("--dev_path", type=str, help="Path to the validation set of QQP (tsv)")
 
 parser.add_argument("--num_epochs", type=int, default=2)
 parser.add_argument("--max_seq_len", type=int, default=41)

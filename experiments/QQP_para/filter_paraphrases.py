@@ -16,8 +16,7 @@ from src.visualization.visualize import multicolumn_visualization
 
 parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug_filtering")
-parser.add_argument("--pretrained_name_or_path", type=str,
-                    default="/home/matej/Documents/embeddia/paraphrasing/nli2paraphrases/models/QQP_para/qqp-roberta-base-2e-5-maxlength55")
+parser.add_argument("--pretrained_name_or_path", type=str)
 parser.add_argument("--model_type", type=str, default="roberta",
                     choices=["bert", "roberta", "xlm-roberta"])
 parser.add_argument("--max_seq_len", type=int, default=55)
@@ -26,8 +25,8 @@ parser.add_argument("--batch_size", type=int, default=16,
 
 parser.add_argument("--reverse_order", action="store_true")
 
-parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/qqp/train.tsv")
-parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/qqp/dev.tsv")
+parser.add_argument("--train_path", type=str, help="Path to the training set of QQP (tsv)")
+parser.add_argument("--dev_path", type=str, help="Path to the validation set of QQP (tsv)")
 
 parser.add_argument("--l2r_strategy", choices=["ground_truth", "argmax", "thresh"], default="ground_truth")
 parser.add_argument("--r2l_strategy", choices=["argmax", "thresh"], default="argmax")

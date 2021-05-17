@@ -28,8 +28,8 @@ parser.add_argument("--optimized_metric", default="binary_f1",
                     choices=["loss", "accuracy", "binary_f1"])
 parser.add_argument("--no_reweigh", action="store_true")
 
-parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/mrpc/msr_paraphrase_train.txt")
-parser.add_argument("--test_path", type=str, default="/home/matej/Documents/data/mrpc/msr_paraphrase_test.txt")
+parser.add_argument("--train_path", type=str, help="Path to training set of MRPC (txt)")
+parser.add_argument("--test_path", type=str, help="Path to test set of MRPC (txt)")
 
 parser.add_argument("--num_epochs", type=int, default=2)
 parser.add_argument("--max_seq_len", type=int, default=74)

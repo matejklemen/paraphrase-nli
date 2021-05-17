@@ -23,13 +23,11 @@ parser.add_argument("--model_type", type=str, default="bert",
 parser.add_argument("--create_test_from_validation", action="store_true",
                     help="If set, split the validation set in half and use one half as a test set substitute")
 
-parser.add_argument("--train_path", type=str, default="/home/matej/Documents/data/RTE/train.csv")
-parser.add_argument("--dev_path", type=str, default="/home/matej/Documents/data/RTE/val.csv")
-parser.add_argument("--test_path", type=str, default="/home/matej/Documents/data/RTE/test.csv")
+parser.add_argument("--train_path", type=str, help="Path to the training set of RTE (csv)")
+parser.add_argument("--dev_path", type=str, help="Path to the validation set of RTE (csv)")
+parser.add_argument("--test_path", type=str, help="Path to the test set of RTE (csv)")
 
 parser.add_argument("--num_epochs", type=int, default=3)
-# crosloengual BERT: 95th perc.=192, 99th perc.=247
-# sloberta: 95th perc.=177, 99th perc.=224
 parser.add_argument("--max_seq_len", type=int, default=41)
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--learning_rate", type=float, default=2e-5)

@@ -7,13 +7,6 @@ import torch
 from torch.utils.data import Dataset
 import pandas as pd
 
-""" 
-This file contains NLI-related dataset constructors.
-
-TODO: ESNLI? -> explanations are paraphrases by design
-TODO: ANLI?
-"""
-
 
 class TransformersSeqPairDataset(Dataset):
     def __init__(self, **kwargs):
@@ -238,24 +231,3 @@ class RTETransformersDataset(TransformersSeqPairDataset):
         encoded["labels"] = valid_label
 
         super().__init__(**encoded)
-
-
-if __name__ == "__main__":
-    from transformers import BertTokenizerFast, RobertaTokenizerFast
-    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-    dataset = XNLITransformersDataset("en", "validation", tokenizer=tokenizer,
-                                      max_length=40, return_tensors="pt")
-
-    print("Before:")
-    print(len(dataset))
-
-    df = pd.read_csv("/home/matej/Documents/data/XNLI-MT/xnli/xnli.test.en.tsv", sep="\t")
-    dataset.override_data(df["sentence1"].tolist(), df["sentence2"].tolist(),
-                          new_labels=df["gold_label"].apply(lambda str_label: dataset.label2idx[str_label]))
-
-    print("After:")
-    print(len(dataset))
-
-    print(dataset.valid_attrs)
-    for k in dataset.valid_attrs:
-        print(len(getattr(dataset, k)))
