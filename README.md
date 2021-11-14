@@ -2,7 +2,8 @@ nli2paraphrases
 ==============================
 
 Source code repository accompanying the preprint `Extracting and filtering paraphrases by bridging natural language 
-inference and paraphrasing`.
+inference and paraphrasing`. The idea presented in the paper is to re-use NLI datasets for paraphrasing, by finding 
+paraphrases through bidirectional entailment.
 
 Setup
 -----
