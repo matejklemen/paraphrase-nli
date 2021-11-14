@@ -1,7 +1,7 @@
 nli2paraphrases
 ==============================
 
-Source code repository accompanying the paper `Extracting and filtering paraphrases by bridging natural language 
+Source code repository accompanying the preprint `Extracting and filtering paraphrases by bridging natural language 
 inference and paraphrasing`.
 
 Setup
