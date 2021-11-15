@@ -231,3 +231,57 @@ class RTETransformersDataset(TransformersSeqPairDataset):
         encoded["labels"] = valid_label
 
         super().__init__(**encoded)
+
+
+class SciTailTransformersDataset(TransformersSeqPairDataset):
+    def __init__(self, split: Union[str, Iterable[str]], tokenizer, max_length: Optional[int] = None, return_tensors: Optional[str] = None,
+                 custom_label_names: Optional[List[str]] = None, binarize: Optional[bool] = False):
+        _split = (split,) if isinstance(split, str) else split
+
+        datasets_list = [datasets.load_dataset("scitail", "tsv_format", split=curr_split) for curr_split in _split]
+        all_hypothesis = list(itertools.chain(*[curr_dataset["hypothesis"] for curr_dataset in datasets_list]))
+        all_premise = list(itertools.chain(*[curr_dataset["premise"] for curr_dataset in datasets_list]))
+        all_label = list(itertools.chain(*[curr_dataset["label"] for curr_dataset in datasets_list]))
+
+        if custom_label_names is None:
+            self.label_names = ["neutral", "entails"]
+        else:
+            # SciTail is two-class NLI
+            assert len(custom_label_names) == 2
+            self.label_names = custom_label_names
+
+        self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
+        self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
+        all_label = [self.label2idx.get(_lbl, -1) for _lbl in all_label]
+
+        # Examples that have a valid label (!= -1)
+        valid_indices = [_i for _i in range(len(all_label)) if all_label[_i] != -1]
+
+        self.str_premise = [all_premise[_i] for _i in valid_indices]
+        self.str_hypothesis = [all_hypothesis[_i] for _i in valid_indices]
+        valid_label = [all_label[_i] for _i in valid_indices]
+
+        optional_kwargs = {}
+        if return_tensors is not None:
+            valid_label = torch.tensor(valid_label)
+            optional_kwargs["return_tensors"] = "pt"
+
+        if max_length is not None:
+            optional_kwargs["max_length"] = max_length
+            optional_kwargs["padding"] = "max_length"
+            optional_kwargs["truncation"] = "longest_first"
+
+        encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
+        encoded["labels"] = valid_label
+
+        if binarize:
+            # Leave the argument in for consistency though
+            warn("'binarize' is an unused argument in SciTail as it is binary by default")
+
+        super().__init__(**encoded)
+
+
+if __name__ == "__main__":
+    from transformers import RobertaTokenizerFast
+    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+    dataset = SciTailTransformersDataset("train", tokenizer)
