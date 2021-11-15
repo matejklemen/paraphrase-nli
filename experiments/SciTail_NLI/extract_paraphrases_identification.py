@@ -15,11 +15,12 @@ from src.models.nli_trainer import TransformersNLITrainer
 from src.visualization.visualize import multicolumn_visualization
 
 parser = ArgumentParser()
-parser.add_argument("--experiment_dir", type=str, default="debug_extraction")
-parser.add_argument("--pretrained_name_or_path", type=str)
-parser.add_argument("--model_type", type=str, default="bert",
+parser.add_argument("--experiment_dir", type=str, default="debug_extraction_id")
+parser.add_argument("--pretrained_name_or_path", type=str,
+                    default="/home/matej/Documents/paraphrase-nli/models/SNLI_NLI/snli-roberta-base-2e-5-maxlength42")
+parser.add_argument("--model_type", type=str, default="roberta",
                     choices=["bert", "roberta", "xlm-roberta"])
-parser.add_argument("--max_seq_len", type=int, default=51)
+parser.add_argument("--max_seq_len", type=int, default=42)
 parser.add_argument("--batch_size", type=int, default=16,
                     help="Evaluation batch size. Note that this can generally be set much higher than in training mode")
 
@@ -53,8 +54,9 @@ def get_predictions(model, test_set, pred_strategy="argmax", num_mcd_rounds=0, t
         preds = torch.argmax(mean_proba, dim=-1)
     elif pred_strategy == "thresh":
         assert thresh is not None
+        highest_proba_class = torch.argmax(mean_proba, dim=-1)
         preds = -1 * torch.ones(mean_proba.shape[0], dtype=torch.long)
-        valid_preds = torch.gt(mean_proba[:, test_set.label2idx["entails"]], thresh)
+        valid_preds = torch.gt(mean_proba[torch.arange(mean_proba.shape[0]), highest_proba_class], thresh)
 
         preds[valid_preds] = test_set.label2idx["entails"]
     else:
@@ -113,7 +115,8 @@ if __name__ == "__main__":
 
     all_paras = {
         "sequence1": [],
-        "sequence2": []
+        "sequence2": [],
+        "label": []
     }
 
     t1 = time()
@@ -125,14 +128,15 @@ if __name__ == "__main__":
             "premise": dataset.str_premise,
             "hypothesis": dataset.str_hypothesis
         }
+        # mean and sd probability of PREDICTED label (not necessarily entailment, as in other script)
         mean_probas = torch.zeros(len(dataset), dtype=torch.float32)
         sd_probas = torch.zeros_like(mean_probas)
         l2r_labels = torch.zeros(len(dataset), dtype=torch.long)
 
         if args.l2r_strategy == "ground_truth":
             assert hasattr(dataset, "labels")
-            ent_mask = dataset.labels == dataset.label2idx["entails"]
-            mean_probas[ent_mask] = 1.0
+            mean_probas[:] = 1.0
+            sd_probas[:] = 0.0
             l2r_labels = dataset.labels
         else:
             res = get_predictions(model, dataset,
@@ -140,10 +144,9 @@ if __name__ == "__main__":
                                   thresh=args.l2r_thresh,
                                   num_mcd_rounds=args.l2r_mcd_rounds)
 
-            ent_mask = (res["pred_label"] == dataset.label2idx["entails"])
             l2r_labels = res["pred_label"]
-            mean_probas = res["mean_proba"][:, dataset.label2idx["entails"]]
-            sd_probas = res["sd_proba"][:, dataset.label2idx["entails"]]
+            mean_probas = res["mean_proba"][torch.arange(len(dataset)), l2r_labels]
+            sd_probas = res["sd_proba"][torch.arange(len(dataset)), l2r_labels]
 
         l2r_preds["label"] = list(map(lambda i: dataset.label_names[i], l2r_labels.tolist()))
         l2r_preds["mean_proba"] = mean_probas.tolist()
@@ -156,19 +159,16 @@ if __name__ == "__main__":
             multicolumn_visualization(
                 column_names=["Input", "Ground truth", f"{args.l2r_strategy} (l2r)"],
                 column_values=[dataset.str_premise, dataset.str_hypothesis, l2r_preds["label"]],
-                column_metric_data=[None, None, {"mean(P(y=ent))": l2r_preds["mean_proba"], "sd(P(y=ent))": l2r_preds["sd_proba"], "y": l2r_preds["label"]}],
-                global_metric_data=[None, None, {"num_entailment": int(torch.sum(ent_mask))}],
+                column_metric_data=[None, None, {"mean(P(y=y_hat))": l2r_preds["mean_proba"], "sd(P(y=y_hat))": l2r_preds["sd_proba"], "y_hat": l2r_preds["label"]}],
                 sort_by_system=(2, 0),  # sort by mean_proba
                 path=os.path.join(l2r_dir, f"{dataset_name}_visualization.html")
             )
         else:
             logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
-        ent_inds = torch.flatten(torch.nonzero(ent_mask, as_tuple=False)).tolist()
-
         # Reverse the order
-        new_prem = [dataset.str_hypothesis[_i] for _i in ent_inds]
-        new_hyp = [dataset.str_premise[_i] for _i in ent_inds]
+        new_prem = dataset.str_hypothesis
+        new_hyp = dataset.str_premise
 
         encoded = tokenizer.batch_encode_plus(list(zip(new_prem, new_hyp)),
                                               max_length=args.max_seq_len, padding="max_length",
@@ -195,11 +195,10 @@ if __name__ == "__main__":
                                       thresh=args.r2l_thresh,
                                       num_mcd_rounds=args.r2l_mcd_rounds)
         r2l_preds["label"] = list(map(lambda i: dataset.label_names[i], reverse_res["pred_label"].tolist()))
-        r2l_preds["mean_proba"] = reverse_res["mean_proba"][:, dataset.label2idx["entails"]].tolist()
-        r2l_preds["sd_proba"] = reverse_res["sd_proba"][:, dataset.label2idx["entails"]].tolist()
-
-        rev_ent_mask = reverse_res["pred_label"] == dataset.label2idx["entails"]  # type: torch.tensor
-        rev_ent_inds = torch.flatten(torch.nonzero(rev_ent_mask, as_tuple=False)).tolist()
+        r2l_preds["mean_proba"] = reverse_res["mean_proba"][torch.arange(len(dataset)),
+                                                            reverse_res["pred_label"]].tolist()
+        r2l_preds["sd_proba"] = reverse_res["sd_proba"][torch.arange(len(dataset)),
+                                                        reverse_res["pred_label"]].tolist()
 
         logging.info(f"Writing right-to-left prediction information to file ({len(dataset)} rows)")
         pd.DataFrame(r2l_preds).to_csv(os.path.join(r2l_dir, f"{dataset_name}_preds.csv"),
@@ -210,29 +209,49 @@ if __name__ == "__main__":
                 column_names=["Input", "Ground truth", f"{args.r2l_strategy} (r2l)"],
                 column_values=[dataset.str_premise, dataset.str_hypothesis, r2l_preds["label"]],
                 column_metric_data=[None, None,
-                                    {"mean(P(y=ent))": r2l_preds["mean_proba"], "sd(P(y=ent))": r2l_preds["sd_proba"],
-                                     "y": r2l_preds["label"]}],
-                global_metric_data=[None, None, {"num_entailment": int(torch.sum(rev_ent_mask))}],
+                                    {"mean(P(y=y_hat))": r2l_preds["mean_proba"], "sd(P(y=y_hat))": r2l_preds["sd_proba"],
+                                     "y_hat": r2l_preds["label"]}],
                 sort_by_system=(2, 0),  # sort by mean_proba
                 path=os.path.join(r2l_dir, f"{dataset_name}_visualization.html")
             )
         else:
             logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
-        logging.info(f"{len(rev_ent_inds)} paraphrases found!")
-        paras = {"sequence1": [], "sequence2": []}
-        for _i in rev_ent_inds:
-            # Write them in the order in which they first appeared in (in NLI dataset)
+        paras_mask = torch.logical_and(l2r_labels == dataset.label2idx["entails"],
+                                       reverse_res["pred_label"] == dataset.label2idx["entails"])
+        nonparas_mask = torch.logical_or(torch.logical_and(l2r_labels == dataset.label2idx["entails"],
+                                                           reverse_res["pred_label"] == dataset.label2idx["neutral"]),
+                                         torch.logical_and(l2r_labels == dataset.label2idx["neutral"],
+                                                           reverse_res["pred_label"] == dataset.label2idx["entails"]))
+        para_inds = torch.flatten(torch.nonzero(paras_mask, as_tuple=False)).tolist()
+        nonpara_inds = torch.flatten(torch.nonzero(nonparas_mask, as_tuple=False)).tolist()
+        logging.info(f"{len(para_inds)} paraphrases and {len(nonpara_inds)} (challenging) non-paraphrases found!")
+
+        paras = {"sequence1": [], "sequence2": [], "label": []}
+        # Write pairs in the order in which they first appeared in (i.e. non-reversed)
+        for _i in para_inds:
             paras["sequence1"].append(dataset.str_hypothesis[_i])
             paras["sequence2"].append(dataset.str_premise[_i])
+            paras["label"].append(1)
 
-        logging.info(f"Writing paraphrases for dataset '{dataset_name}' ({len(paras['sequence1'])} examples)")
-        model_metrics[f"paraphrases_{dataset_name}"] = len(paras['sequence1'])
-        pd.DataFrame(paras).to_csv(os.path.join(args.experiment_dir, f"{dataset_name}_paraphrases.csv"),
+        for _i in nonpara_inds:
+            paras["sequence1"].append(dataset.str_hypothesis[_i])
+            paras["sequence2"].append(dataset.str_premise[_i])
+            paras["label"].append(0)
+
+        logging.info(f"Writing paraphrase identification examples for dataset '{dataset_name}' "
+                     f"({len(paras['sequence1'])} examples)")
+        model_metrics[f"paraphrases_{dataset_name}"] = {
+            "total": len(para_inds) + len(nonpara_inds),
+            "paraphrases": len(para_inds),
+            "non-paraphrases": len(nonpara_inds)
+        }
+        pd.DataFrame(paras).to_csv(os.path.join(args.experiment_dir, f"{dataset_name}_para_id.csv"),
                                    sep=",", index=False, quoting=csv.QUOTE_ALL)
 
         all_paras["sequence1"].extend(paras["sequence1"])
         all_paras["sequence2"].extend(paras["sequence2"])
+        all_paras["label"].extend(paras["label"])
 
     t2 = time()
     logging.info(f"Extraction took {t2 - t1: .4f}s")
@@ -243,5 +262,5 @@ if __name__ == "__main__":
         json.dump(model_metrics, fp=f_metrics, indent=4)
 
     logging.info(f"Writing combined paraphrases ({len(all_paras['sequence1'])} examples)")
-    pd.DataFrame(all_paras).to_csv(os.path.join(args.experiment_dir, f"all_paraphrases.csv"),
+    pd.DataFrame(all_paras).to_csv(os.path.join(args.experiment_dir, f"all_para_id.csv"),
                                    sep=",", index=False, quoting=csv.QUOTE_ALL)
