@@ -57,8 +57,9 @@ def get_predictions(model, test_set, pred_strategy="argmax", num_mcd_rounds=0, t
         preds = torch.argmax(mean_proba, dim=-1)
     elif pred_strategy == "thresh":
         assert thresh is not None
+        highest_proba_class = torch.argmax(mean_proba, dim=-1)
         preds = -1 * torch.ones(mean_proba.shape[0], dtype=torch.long)
-        valid_preds = torch.gt(mean_proba[:, test_set.label2idx["entailment"]], thresh)
+        valid_preds = torch.gt(mean_proba[torch.arange(mean_proba.shape[0]), highest_proba_class], thresh)
 
         preds[valid_preds] = test_set.label2idx["entailment"]
     else:
