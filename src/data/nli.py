@@ -281,7 +281,62 @@ class SciTailTransformersDataset(TransformersSeqPairDataset):
         super().__init__(**encoded)
 
 
+class OCNLIDataset(TransformersSeqPairDataset):
+    def __init__(self, path: Union[str, Iterable[str]], tokenizer,
+                 max_length: Optional[int] = None, return_tensors: Optional[str] = None,
+                 binarize: Optional[bool] = False):
+        _path = (path,) if isinstance(path, str) else path
+        df = pd.concat([pd.read_json(curr_path, lines=True) for curr_path in _path]).reset_index(drop=True)
+
+        self.label_names = ["entailment", "neutral", "contradiction"]
+        self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
+        self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
+
+        self.str_premise = df["sentence1"].tolist()
+        self.str_hypothesis = df["sentence2"].tolist()
+        self.genre = df["genre"].tolist()
+
+        if "label" in df.columns:
+            valid_label = list(map(lambda lbl: self.label2idx.get(lbl, -1), df["label"].tolist()))
+        else:
+            warn(f"No labels present in file - setting all labels to 0, so you should ignore metrics based on these")
+            valid_label = [0] * len(self.str_premise)
+
+        # Examples that have a valid label (!= -1)
+        valid_indices = [_i for _i in range(len(valid_label)) if valid_label[_i] != -1]
+
+        self.str_premise = [self.str_premise[_i] for _i in valid_indices]
+        self.str_hypothesis = [self.str_hypothesis[_i] for _i in valid_indices]
+        self.genre = [self.genre[_i] for _i in valid_indices]
+        valid_label = [valid_label[_i] for _i in valid_indices]
+
+        optional_kwargs = {}
+        if return_tensors is not None:
+            valid_label = torch.tensor(valid_label)
+            optional_kwargs["return_tensors"] = "pt"
+
+        if max_length is not None:
+            optional_kwargs["max_length"] = max_length
+            optional_kwargs["padding"] = "max_length"
+            optional_kwargs["truncation"] = "longest_first"
+
+        encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
+        encoded["labels"] = valid_label
+
+        if binarize:
+            encoded["labels"] = (encoded["labels"] == self.label2idx["entailment"]).long()
+            self.label_names = ["not_entailment", "entailment"]
+            self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
+            self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
+
+        super().__init__(**encoded)
+
+
 if __name__ == "__main__":
-    from transformers import RobertaTokenizerFast
-    tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-    dataset = SciTailTransformersDataset("train", tokenizer)
+    from transformers import BertTokenizerFast
+    tokenizer = BertTokenizerFast.from_pretrained("hfl/chinese-roberta-wwm-ext")
+    # dataset = SciTailTransformersDataset("train", tokenizer)
+
+    # hfl/chinese-roberta-wwm-ext
+    # hfl/chinese-roberta-wwm-ext-large
+    dataset = OCNLIDataset("/home/matej/Documents/data/ocnli/train.50k.json", tokenizer)
