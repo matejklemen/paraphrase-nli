@@ -251,6 +251,7 @@ if __name__ == "__main__":
         logging.info(model_metrics)
         json.dump(model_metrics, fp=f_metrics, indent=4)
 
+    model_metrics["paraphrases_total"] = len(all_paras['sequence1'])
     logging.info(f"Writing combined paraphrases ({len(all_paras['sequence1'])} examples)")
     pd.DataFrame(all_paras).to_csv(os.path.join(args.experiment_dir, f"all_paraphrases.csv"),
                                    sep=",", index=False, quoting=csv.QUOTE_ALL)
