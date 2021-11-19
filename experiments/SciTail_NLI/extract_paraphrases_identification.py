@@ -58,7 +58,7 @@ def get_predictions(model, test_set, pred_strategy="argmax", num_mcd_rounds=0, t
         preds = -1 * torch.ones(mean_proba.shape[0], dtype=torch.long)
         valid_preds = torch.gt(mean_proba[torch.arange(mean_proba.shape[0]), highest_proba_class], thresh)
 
-        preds[valid_preds] = test_set.label2idx["entails"]
+        preds[valid_preds] = highest_proba_class[valid_preds]
     else:
         raise NotImplementedError()
 
