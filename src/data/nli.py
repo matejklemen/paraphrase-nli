@@ -1,4 +1,5 @@
 import itertools
+from copy import deepcopy
 from typing import Optional, List, Union, Iterable
 from warnings import warn
 
@@ -332,11 +333,51 @@ class OCNLIDataset(TransformersSeqPairDataset):
         super().__init__(**encoded)
 
 
+class AssinTransformersDataset(TransformersSeqPairDataset):
+    def __init__(self, split: Union[str, Iterable[str]], tokenizer, max_length: Optional[int] = None,
+                 return_tensors: Optional[str] = None):
+        _split = (split,) if isinstance(split, str) else split
+
+        datasets_list = [datasets.load_dataset("assin", "full", split=curr_split) for curr_split in _split]
+        all_hypothesis = list(itertools.chain(*[curr_dataset["hypothesis"] for curr_dataset in datasets_list]))
+        all_premise = list(itertools.chain(*[curr_dataset["premise"] for curr_dataset in datasets_list]))
+        # NOTE: intentional typo as it is like this in hf/datasets repository
+        all_label = list(itertools.chain(*[curr_dataset["entailment_judgment"] for curr_dataset in datasets_list]))
+
+        self.orig_label_names = ["neutral", "entailment", "paraphrase"]
+        self.orig_label = deepcopy(all_label)
+
+        all_label = list(map(lambda _lbl: int(_lbl >= 1), all_label))  # group {entailment, paraphrase} into entailment
+        self.label_names = ["neutral", "entailment"]
+
+        self.label2idx = {curr_label: i for i, curr_label in enumerate(self.label_names)}
+        self.idx2label = {i: curr_label for curr_label, i in self.label2idx.items()}
+
+        self.str_premise = all_premise
+        self.str_hypothesis = all_hypothesis
+        valid_label = all_label
+
+        optional_kwargs = {}
+        if return_tensors is not None:
+            valid_label = torch.tensor(valid_label)
+            optional_kwargs["return_tensors"] = "pt"
+
+        if max_length is not None:
+            optional_kwargs["max_length"] = max_length
+            optional_kwargs["padding"] = "max_length"
+            optional_kwargs["truncation"] = "longest_first"
+
+        encoded = tokenizer.batch_encode_plus(list(zip(self.str_premise, self.str_hypothesis)), **optional_kwargs)
+        encoded["labels"] = valid_label
+
+        super().__init__(**encoded)
+
+
 if __name__ == "__main__":
     from transformers import BertTokenizerFast
-    tokenizer = BertTokenizerFast.from_pretrained("hfl/chinese-roberta-wwm-ext")
+    tokenizer = BertTokenizerFast.from_pretrained("neuralmind/bert-base-portuguese-cased")
     # dataset = SciTailTransformersDataset("train", tokenizer)
 
     # hfl/chinese-roberta-wwm-ext
     # hfl/chinese-roberta-wwm-ext-large
-    dataset = OCNLIDataset("/home/matej/Documents/data/ocnli/train.50k.json", tokenizer)
+    dataset = AssinTransformersDataset("train", tokenizer)
