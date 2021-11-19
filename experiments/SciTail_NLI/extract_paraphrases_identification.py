@@ -256,6 +256,8 @@ if __name__ == "__main__":
     t2 = time()
     logging.info(f"Extraction took {t2 - t1: .4f}s")
     model_metrics["time_taken"] = round(t2 - t1, 4)
+    model_metrics["paraphrases_total"] = sum(all_paras["label"])
+    model_metrics["nonparaphrases_total"] = len(all_paras["label"]) - model_metrics["paraphrases_total"]
 
     with open(os.path.join(args.experiment_dir, "metrics.json"), "w") as f_metrics:
         logging.info(model_metrics)
