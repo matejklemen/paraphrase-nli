@@ -225,11 +225,16 @@ if __name__ == "__main__":
         else:
             logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
+        # To obtain challenging non-paraphrases, we use (ent, neutral) pairs - these are not available in binary case,
+        # so we use (ent, non-ent) pairs there
+        OTHER_LABEL = "not_entailment" if args.binary_task else "neutral"
+        assert dataset.label2idx.get(OTHER_LABEL, None) is not None
+
         paras_mask = torch.logical_and(l2r_labels == dataset.label2idx["entailment"],
                                        reverse_res["pred_label"] == dataset.label2idx["entailment"])
         nonparas_mask = torch.logical_or(torch.logical_and(l2r_labels == dataset.label2idx["entailment"],
-                                                           reverse_res["pred_label"] == dataset.label2idx["neutral"]),
-                                         torch.logical_and(l2r_labels == dataset.label2idx["neutral"],
+                                                           reverse_res["pred_label"] == dataset.label2idx[OTHER_LABEL]),
+                                         torch.logical_and(l2r_labels == dataset.label2idx[OTHER_LABEL],
                                                            reverse_res["pred_label"] == dataset.label2idx["entailment"]))
         para_inds = torch.flatten(torch.nonzero(paras_mask, as_tuple=False)).tolist()
         nonpara_inds = torch.flatten(torch.nonzero(nonparas_mask, as_tuple=False)).tolist()
