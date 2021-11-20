@@ -120,7 +120,8 @@ if __name__ == "__main__":
 
     all_paras = {
         "sequence1": [],
-        "sequence2": []
+        "sequence2": [],
+        "label": []
     }
 
     processed_datasets = ["train", "validation_matched", "validation_mismatched"]
