@@ -155,7 +155,7 @@ if __name__ == "__main__":
             mean_probas = res["mean_proba"][torch.arange(len(dataset)), l2r_labels]
             sd_probas = res["sd_proba"][torch.arange(len(dataset)), l2r_labels]
 
-        l2r_preds["label"] = list(map(lambda i: dataset.label_names[i], l2r_labels.tolist()))
+        l2r_preds["label"] = list(map(lambda i: dataset.label2idx.get(i, "other"), l2r_labels.tolist()))
         l2r_preds["mean_proba"] = mean_probas.tolist()
         l2r_preds["sd_proba"] = sd_probas.tolist()
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
                                       pred_strategy=args.r2l_strategy,
                                       thresh=args.r2l_thresh,
                                       num_mcd_rounds=args.r2l_mcd_rounds)
-        r2l_preds["label"] = list(map(lambda i: dataset.label_names[i], reverse_res["pred_label"].tolist()))
+        r2l_preds["label"] = list(map(lambda i: dataset.label2idx.get(i, "other"), reverse_res["pred_label"].tolist()))
         r2l_preds["mean_proba"] = reverse_res["mean_proba"][torch.arange(len(dataset)),
                                                             reverse_res["pred_label"]].tolist()
         r2l_preds["sd_proba"] = reverse_res["sd_proba"][torch.arange(len(dataset)),
