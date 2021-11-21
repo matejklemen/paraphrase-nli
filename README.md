@@ -1,9 +1,23 @@
 nli2paraphrases
 ==============================
 
-Source code repository accompanying the preprint `Extracting and filtering paraphrases by bridging natural language 
-inference and paraphrasing`. The idea presented in the paper is to re-use NLI datasets for paraphrasing, by finding 
-paraphrases through bidirectional entailment.
+Source code repository accompanying the preprint [Extracting and filtering paraphrases by bridging natural language 
+inference and paraphrasing](https://arxiv.org/abs/2111.07119). 
+
+The first idea presented in the paper is to re-use NLI datasets for paraphrasing, by finding 
+paraphrases through **bidirectional entailment**.   
+Additionally, a similar idea can be reused to filter existing paraphrasing dataset by enforcing **bidirectional paraphrase relation**.
+
+```
+@misc{klemen2021extracting,
+      title={Extracting and filtering paraphrases by bridging natural language inference and paraphrasing}, 
+      author={Matej Klemen and Marko Robnik-Šikonja},
+      year={2021},
+      eprint={2111.07119},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
 
 Setup
 -----
