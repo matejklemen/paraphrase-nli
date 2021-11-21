@@ -282,7 +282,7 @@ class SciTailTransformersDataset(TransformersSeqPairDataset):
         super().__init__(**encoded)
 
 
-class OCNLIDataset(TransformersSeqPairDataset):
+class OCNLITransformersDataset(TransformersSeqPairDataset):
     def __init__(self, path: Union[str, Iterable[str]], tokenizer,
                  max_length: Optional[int] = None, return_tensors: Optional[str] = None,
                  binarize: Optional[bool] = False):

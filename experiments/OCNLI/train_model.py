@@ -8,7 +8,7 @@ import torch
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix
 from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast
 
-from src.data.nli import OCNLIDataset
+from src.data.nli import OCNLITransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
 
 import numpy as np
@@ -72,12 +72,12 @@ if __name__ == "__main__":
     tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
     tokenizer.save_pretrained(args.experiment_dir)
 
-    train_set = OCNLIDataset(args.train_path, tokenizer=tokenizer,
-                             max_length=args.max_seq_len, return_tensors="pt",
-                             binarize=args.binary_task)
-    dev_set = OCNLIDataset(args.dev_path, tokenizer=tokenizer,
-                           max_length=args.max_seq_len, return_tensors="pt",
-                           binarize=args.binary_task)
+    train_set = OCNLITransformersDataset(args.train_path, tokenizer=tokenizer,
+                                         max_length=args.max_seq_len, return_tensors="pt",
+                                         binarize=args.binary_task)
+    dev_set = OCNLITransformersDataset(args.dev_path, tokenizer=tokenizer,
+                                       max_length=args.max_seq_len, return_tensors="pt",
+                                       binarize=args.binary_task)
 
     # Create test set from validation set: set aside 50% of examples
     logging.info("Dividing validation set into two parts and using one as test set")
@@ -86,9 +86,9 @@ if __name__ == "__main__":
     test_indices = indices[int(0.5 * len(indices)):]
 
     # Instantiate dummy set, override with actual data
-    test_set = OCNLIDataset(args.dev_path, tokenizer=tokenizer,
-                            max_length=args.max_seq_len, return_tensors="pt",
-                            binarize=args.binary_task)
+    test_set = OCNLITransformersDataset(args.dev_path, tokenizer=tokenizer,
+                                        max_length=args.max_seq_len, return_tensors="pt",
+                                        binarize=args.binary_task)
 
     # NOTE: order important here! First copy to test set, then fix dev set itself
     for curr_set, curr_indices in [(test_set, test_indices), (dev_set, dev_indices)]:
