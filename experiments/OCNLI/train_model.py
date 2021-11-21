@@ -21,9 +21,9 @@ parser.add_argument("--pretrained_name_or_path", type=str, default="hfl/chinese-
 parser.add_argument("--model_type", type=str, default="bert",
                     choices=["bert", "roberta", "xlm-roberta"])
 
-parser.add_argument("--train_path", type=str, help="Path to the training set of RTE (csv)",
+parser.add_argument("--train_path", type=str, help="Path to the training set of OCNLI (json)",
                     default="/home/matej/Documents/data/ocnli/train.50k.json")
-parser.add_argument("--dev_path", type=str, help="Path to the validation set of RTE (csv)",
+parser.add_argument("--dev_path", type=str, help="Path to the validation set of OCNLI (json)",
                     default="/home/matej/Documents/data/ocnli/dev.json")
 parser.add_argument("--binary_task", action="store_true",
                     help="If set, convert the NLI task into a RTE task, i.e. predicting whether y == entailment or not")
