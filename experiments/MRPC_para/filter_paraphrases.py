@@ -152,7 +152,7 @@ if __name__ == "__main__":
             mean_probas = res["mean_proba"][:, dataset.label2idx["paraphrase"]]
             sd_probas = res["sd_proba"][:, dataset.label2idx["paraphrase"]]
 
-        l2r_preds["label"] = list(map(lambda i: dataset.label2idx.get(i, "other"), l2r_labels.tolist()))
+        l2r_preds["label"] = list(map(lambda i: dataset.idx2label.get(i, "other"), l2r_labels.tolist()))
         l2r_preds["mean_proba"] = mean_probas.tolist()
         l2r_preds["sd_proba"] = sd_probas.tolist()
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
                                       num_mcd_rounds=args.r2l_mcd_rounds)
 
         # Note that for right-to-left we are interested in P(y=not_paraphrase) (filtering!)
-        r2l_preds["label"] = list(map(lambda i: dataset.label2idx.get(i, "other"), reverse_res["pred_label"].tolist()))
+        r2l_preds["label"] = list(map(lambda i: dataset.idx2label.get(i, "other"), reverse_res["pred_label"].tolist()))
         r2l_preds["mean_proba"] = reverse_res["mean_proba"][:, dataset.label2idx["not_paraphrase"]].tolist()
         r2l_preds["sd_proba"] = reverse_res["sd_proba"][:, dataset.label2idx["not_paraphrase"]].tolist()
 
