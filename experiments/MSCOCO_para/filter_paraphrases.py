@@ -26,12 +26,9 @@ parser.add_argument("--batch_size", type=int, default=16,
 
 parser.add_argument("--reverse_order", action="store_true")
 
-parser.add_argument("--train_path", type=str, help="Path to the training set of MSCOCO (tsv)",
-                    default="id_captions_train2014.tsv")
-parser.add_argument("--dev_path", type=str, help="Path to the validation set of MSCOCO (tsv)",
-                    default="id_captions_val2014.tsv")
-parser.add_argument("--test_path", type=str, help="Path to the test set of MSCOCO (tsv)",
-                    default="id_captions_test2014.tsv")
+parser.add_argument("--train_path", type=str, help="Path to the training set of MSCOCO (tsv)", default=None)
+parser.add_argument("--dev_path", type=str, help="Path to the validation set of MSCOCO (tsv)", default=None)
+parser.add_argument("--test_path", type=str, help="Path to the test set of MSCOCO (tsv)", default=None)
 
 parser.add_argument("--l2r_strategy", choices=["ground_truth", "argmax", "thresh"], default="ground_truth")
 parser.add_argument("--r2l_strategy", choices=["argmax", "thresh"], default="argmax")
@@ -127,7 +124,11 @@ if __name__ == "__main__":
     }
 
     t1 = time()
-    for dataset_name, data_path in [("train", args.train_path), ("dev", args.dev_path)]:
+    for dataset_name, data_path in [("train", args.train_path), ("dev", args.dev_path), ("test", args.test_path)]:
+        if data_path is None:
+            logging.info(f"Path for dataset '{dataset_name}' not provided, skipping...")
+            continue
+
         dataset = MSCOCOTransformersDataset(data_path, tokenizer=tokenizer,
                                             max_length=args.max_seq_len, return_tensors="pt",
                                             reverse_order=args.reverse_order)
