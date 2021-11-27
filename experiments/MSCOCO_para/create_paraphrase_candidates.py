@@ -19,6 +19,16 @@ if __name__ == "__main__":
         "sentence1_image_id": [], "sentence2_image_id": []
     }
 
+    # Add a dummy non-paraphrase as the data loader is for paraphrase identification, a BINARY task, so it expects
+    # two unique labels
+    data["sentence1"].append("dummy s1")
+    data["sentence2"].append("dummy s2")
+    data["is_paraphrase"].append(0)
+    data["cap1_id"].append(-1)
+    data["cap2_id"].append(-1)
+    data["sentence1_image_id"].append(-1)
+    data["sentence2_image_id"].append(-1)
+
     for dataset_name, data_path in [("train", train_path), ("dev", dev_path)]:
         print(f"Processing dataset '{dataset_name}'")
         with open(data_path, "r", encoding="utf-8") as f:
