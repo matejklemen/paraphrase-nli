@@ -14,8 +14,9 @@ if __name__ == "__main__":
     dev_path = os.path.join(DATA_DIR, "captions_val2014.json")
 
     data = {
-        "seq1": [], "seq2": [], "is_paraphrase": [],
-        "im_id": [], "cap1_id": [], "cap2_id": []
+        "sentence1": [], "sentence2": [], "is_paraphrase": [],
+        "cap1_id": [], "cap2_id": [],
+        "sentence1_image_id": [], "sentence2_image_id": []
     }
 
     for dataset_name, data_path in [("train", train_path), ("dev", dev_path)]:
@@ -44,12 +45,13 @@ if __name__ == "__main__":
             first_cap_id = curr_captions[0]
 
             for other_cap_id in curr_captions[1:]:
-                data["seq1"].append(captions[first_cap_id])
-                data["seq2"].append(captions[other_cap_id])
+                data["sentence1"].append(captions[first_cap_id])
+                data["sentence2"].append(captions[other_cap_id])
                 data["is_paraphrase"].append(1)
-                data["im_id"].append(curr_im_id)
                 data["cap1_id"].append(first_cap_id)
                 data["cap2_id"].append(other_cap_id)
+                data["sentence1_image_id"].append(curr_im_id)
+                data["sentence2_image_id"].append(curr_im_id)
 
     df = pd.DataFrame(data)
     print(f"Writing {df.shape[0]} paraphrase candidates")
