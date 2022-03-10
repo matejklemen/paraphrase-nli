@@ -94,6 +94,10 @@ if __name__ == "__main__":
 	dev_df = balanced_data.iloc[indices[int(0.8 * num_ex): int(0.9 * num_ex)]]
 	test_df = balanced_data.iloc[indices[int(0.9 * num_ex):]]
 
+	train_df.to_csv(os.path.join(args.experiment_dir, "train.csv"), sep=",", index=False)
+	dev_df.to_csv(os.path.join(args.experiment_dir, "dev.csv"), sep=",", index=False)
+	test_df.to_csv(os.path.join(args.experiment_dir, "test.csv"), sep=",", index=False)
+
 	tokenizer_cls = RobertaTokenizerFast
 	tokenizer = tokenizer_cls.from_pretrained("roberta-base")
 
@@ -139,6 +143,9 @@ if __name__ == "__main__":
 	if hasattr(test_set, "labels"):
 		np_labels = test_set.labels.numpy()
 		np_pred = test_res["pred_label"].numpy()
+		with open(os.path.join(args.experiment_dir, "test_preds.txt"), "w", encoding="utf-8") as f:
+			for _lbl in np_pred:
+				print(_lbl, file=f)
 
 		conf_matrix = confusion_matrix(y_true=np_labels, y_pred=np_pred)
 		plt.matshow(conf_matrix, cmap="Blues")
