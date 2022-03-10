@@ -195,13 +195,15 @@ class TransformersNLITrainer:
                 if self.optimized_metric == "loss":
                     is_better = val_loss < best_metric
                     val_metric = val_loss
-                elif self.optimized_metric == "binary_f1":
+                elif self.optimized_metric in ["binary_f1", "macro_f1"]:
                     val_acc = float(torch.sum(torch.eq(val_res["pred_label"], val_dataset.labels))) / len(val_dataset)
                     logging.info(f"(Not being optimized) Validation accuracy: {val_acc: .4f}")
 
+                    avg_mode = "binary" if self.optimized_metric == "binary_f1" else "macro"
                     val_f1 = f1_score(y_true=val_dataset.labels.cpu().numpy(),
-                                      y_pred=val_res["pred_label"].cpu().numpy())
-                    logging.info(f"Validation binary F1: {val_f1: .4f}")
+                                      y_pred=val_res["pred_label"].cpu().numpy(),
+                                      average=avg_mode)
+                    logging.info(f"Validation {self.optimized_metric}: {val_f1: .4f}")
                     is_better = val_f1 > best_metric
                     val_metric = val_f1
                 else:
@@ -228,3 +230,7 @@ class TransformersNLITrainer:
                 break
 
         logging.info(f"Training took {time() - train_start:.4f}s")
+
+
+# Alias to increase code clarity - PI = paraphrase identification
+TransformersPITrainer = TransformersNLITrainer
