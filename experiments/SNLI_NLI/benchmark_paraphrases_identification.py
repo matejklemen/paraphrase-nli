@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
 	trainer = TransformersPITrainer(args.experiment_dir,
 									pretrained_model_name_or_path=args.pretrained_name_or_path,
-									num_labels=len(train_set.label_names),
+									num_labels=len(USED_LABELSET),
 									batch_size=args.batch_size,
 									learning_rate=args.learning_rate,
 									validate_every_n_steps=args.validate_every_n_examples,
@@ -145,8 +145,8 @@ if __name__ == "__main__":
 		for (i, j), v in np.ndenumerate(conf_matrix):
 			plt.text(j, i, v, ha='center', va='center',
 					 bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
-		plt.xticks(np.arange(len(test_set.label_names)), USED_LABELSET)
-		plt.yticks(np.arange(len(test_set.label_names)), USED_LABELSET)
+		plt.xticks(np.arange(len(USED_LABELSET)), USED_LABELSET)
+		plt.yticks(np.arange(len(USED_LABELSET)), USED_LABELSET)
 		plt.xlabel("(y_pred)")
 
 		plt.savefig(os.path.join(args.experiment_dir, "confusion_matrix.png"))
