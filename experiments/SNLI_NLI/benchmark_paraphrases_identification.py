@@ -98,9 +98,6 @@ if __name__ == "__main__":
 	dev_df.to_csv(os.path.join(args.experiment_dir, "dev.csv"), sep=",", index=False)
 	test_df.to_csv(os.path.join(args.experiment_dir, "test.csv"), sep=",", index=False)
 
-	tokenizer_cls = RobertaTokenizerFast
-	tokenizer = tokenizer_cls.from_pretrained("roberta-base")
-
 	_encoded_train = tokenizer.batch_encode_plus(
 		list(zip(train_df["sequence1"].tolist(), train_df["sequence2"].tolist())),
 		max_length=args.max_seq_len, padding="max_length", truncation="longest_first", return_tensors="pt"
