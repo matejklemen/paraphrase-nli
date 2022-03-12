@@ -148,7 +148,6 @@ class TransformersNLITrainer:
             res = self.model(**{k: v.to(self.device) for k, v in curr_batch.items()})
             if compute_loss:
                 eval_loss += float(res["loss"])
-            num_batches += 1
 
             probas = torch.softmax(res["logits"], dim=-1)
             preds = self.predict_label(logits=res["logits"])
