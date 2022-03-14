@@ -111,6 +111,11 @@ class AutoregressivePGTrainer:
 
     @torch.no_grad()
     def generate(self, prepr_prompts: List, **generation_kwargs):
+        if self.use_mcd:
+            self.model.train()
+        else:
+            self.model.eval()
+
         max_generated_length = generation_kwargs["max_seq_len"]
         curr_strat = generation_kwargs.get("strategy", {})  # by default, greedy decoding strategy
 
