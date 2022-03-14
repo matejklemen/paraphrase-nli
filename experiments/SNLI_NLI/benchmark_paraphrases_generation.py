@@ -3,26 +3,21 @@ import logging
 import os
 import sys
 from argparse import ArgumentParser
-from time import time
 import re
 
 import numpy as np
 import pandas as pd
 import torch
-from datasets import tqdm
-from matplotlib import pyplot as plt
-from torch import optim
-from torch.utils.data import Subset, DataLoader
-from transformers import GPT2TokenizerFast, GPT2LMHeadModel
+from transformers import GPT2Tokenizer
 
 from src.data.cleaning import mask_not_na, inds_unique, mask_long_enough
 from src.data.nli import TransformersSeqPairDataset
-from src.models.nli_trainer import TransformersPITrainer
+from src.models.pg_trainer import AutoregressivePGTrainer
 
 parser = ArgumentParser()
 parser.add_argument("--experiment_dir", type=str, default="debug")
 parser.add_argument("--paraphrase_path", type=str,
-					default="/home/matej/Documents/paraphrase-nli/experiments/SNLI_NLI/PARAPHRASE_IDENTIFICATION/snli-bin-roberta-base-argmax/all_para_id.csv")
+					default="/home/matej/Documents/paraphrase-nli/experiments/SNLI_NLI/PARAPHRASE_IDENTIFICATION/snli-roberta-base-argmax/all_para_id.csv")
 parser.add_argument("--pretrained_name_or_path", type=str, default="gpt2")
 parser.add_argument("--model_type", type=str, default="gpt2",
 					choices=["gpt2"])
@@ -32,12 +27,11 @@ parser.add_argument("--max_seq_len", type=int, default=52)
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--learning_rate", type=float, default=2e-5)
 parser.add_argument("--early_stopping_rounds", type=int, default=5)
-parser.add_argument("--validate_every_n_examples", type=int, default=3_000)
+parser.add_argument("--validate_every_n_examples", type=int, default=5000)
 parser.add_argument("--random_seed", type=int, default=17)
 
 parser.add_argument("--use_cpu", action="store_true")
 
-# TODO: move training code to a TransformersPGTrainer
 if __name__ == "__main__":
 	args = parser.parse_args()
 	DEVICE = torch.device("cpu") if args.use_cpu else torch.device("cuda")
@@ -66,7 +60,7 @@ if __name__ == "__main__":
 
 	# No AutoTokenizerFast at the moment?
 	if args.model_type == "gpt2":
-		tokenizer_cls = GPT2TokenizerFast
+		tokenizer_cls = GPT2Tokenizer
 	else:
 		raise NotImplementedError(f"Model_type '{args.model_type}' is not supported")
 
@@ -76,11 +70,8 @@ if __name__ == "__main__":
 		"pad_token": "<PAD>",
 		"additional_special_tokens": ["<PARA>"]
 	})
-	SEPARATOR_ID = int(tokenizer.encode("<PARA>", add_special_tokens=False)[0])
 	tokenizer.save_pretrained(args.experiment_dir)
-	model = GPT2LMHeadModel.from_pretrained(args.pretrained_name_or_path).to(DEVICE)
-	model.resize_token_embeddings(len(tokenizer))
-	optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
+	SEPARATOR_ID = int(tokenizer.encode("<PARA>", add_special_tokens=False)[0])
 
 	df = pd.read_csv(args.paraphrase_path)
 	# Basic data cleaning - remove NAs (?), duplicate pairs, pairs with one sequence very short
@@ -146,82 +137,27 @@ if __name__ == "__main__":
 	logging.info(f"Loaded {len(train_set)} training examples, {len(dev_set)} dev examples and "
 				 f"{len(test_set)} test examples")
 
-	train_start = time()
-	best_metric, no_increase = float("inf"), 0
-	stop_early = False
-	for idx_epoch in range(args.num_epochs):
-		logging.info(f"Epoch {1 + idx_epoch}/{args.num_epochs}")
-
-		shuffled_indices = torch.randperm(len(train_set))
-		train_loss, nb = 0.0, 0
-
-		num_minisets = (len(train_set) + args.validate_every_n_examples - 1) // args.validate_every_n_examples
-		for idx_miniset in range(num_minisets):
-			logging.info(f"Miniset {1 + idx_miniset}/{num_minisets}")
-			curr_subset = Subset(train_set, shuffled_indices[idx_miniset * args.validate_every_n_examples:
-															 (idx_miniset + 1) * args.validate_every_n_examples])
-			num_subset_batches = (len(curr_subset) + args.batch_size - 1) // args.batch_size
-
-			model.train()
-			for curr_batch in tqdm(DataLoader(curr_subset, shuffle=False, batch_size=args.batch_size),
-								   total=num_subset_batches):
-				res = model(**{k: v.to(DEVICE) for k, v in curr_batch.items()})
-				curr_loss = res["loss"]
-				train_loss += float(curr_loss)
-
-				curr_loss.backward()
-				optimizer.step()
-				optimizer.zero_grad()
-
-			nb += num_subset_batches
-			logging.info(f"Training loss = {train_loss / nb: .4f}")
-
-			if len(curr_subset) < args.validate_every_n_examples // 2:
-				logging.info(f"Skipping validation after training on a small training subset "
-							 f"({len(curr_subset)} < {args.validate_every_n_examples // 2} examples)")
-				continue
-
-			with torch.no_grad():
-				model.eval()
-				num_dev_batches = (len(dev_set) + args.batch_size - 1) // args.batch_size
-
-				eval_loss = 0.0
-				for curr_batch in tqdm(DataLoader(dev_set, shuffle=False, batch_size=args.batch_size),
-									   total=num_dev_batches):
-					res = model(**{k: v.to(DEVICE) for k, v in curr_batch.items()})
-					eval_loss += float(res["loss"])
-
-				eval_loss /= max(num_dev_batches, 1)
-
-			logging.info(f"Validation loss = {eval_loss: .4f}")
-
-			if eval_loss < best_metric:
-				logging.info("New best! Saving checkpoint")
-				best_metric = eval_loss
-				no_increase = 0
-				model.save_pretrained(args.experiment_dir)
-			else:
-				no_increase += 1
-
-			if no_increase == args.early_stopping_rounds:
-				logging.info(f"Stopping early after validation metric did not improve for "
-							 f"{args.early_stopping_rounds} rounds.")
-				stop_early = True
-				break
-
-		if stop_early:
-			break
-
-	logging.info(f"Training took {time() - train_start:.4f}s. Best validation metric: {best_metric: .4f}")
+	pg_trainer = AutoregressivePGTrainer(args.experiment_dir,
+										 pretrained_model_name_or_path=args.pretrained_name_or_path,
+										 tokenizer_path=args.experiment_dir,
+										 batch_size=args.batch_size,
+										 learning_rate=args.learning_rate,
+										 validate_every_n_steps=args.validate_every_n_examples,
+										 early_stopping_tol=args.early_stopping_rounds,
+										 device=("cuda" if not args.use_cpu else "cpu"))
+	pg_trainer.run(train_dataset=train_set, val_dataset=dev_set, num_epochs=args.num_epochs)
 
 	# Reload best model
-	model = GPT2LMHeadModel.from_pretrained(args.experiment_dir).to(DEVICE)
+	pg_trainer = AutoregressivePGTrainer.from_pretrained(args.experiment_dir)
 
 	dev_prompts = dev_df["sequence1"].apply(lambda s: f"{s} <PARA>")
 	test_prompts = test_df["sequence1"].apply(lambda s: f"{s} <PARA>")
 
 	dev_df["sequence2"].to_csv(os.path.join(args.experiment_dir, "dev_ref.txt"), sep=",", index=False, header=False)
 	test_df["sequence2"].to_csv(os.path.join(args.experiment_dir, "test_ref.txt"), sep=",", index=False, header=False)
+
+	dev_df["sequence1"].to_csv(os.path.join(args.experiment_dir, "dev_input_copy.txt"), sep=",", index=False, header=False)
+	test_df["sequence1"].to_csv(os.path.join(args.experiment_dir, "test_input_copy.txt"), sep=",", index=False, header=False)
 
 	strategies = {
 		"greedy": {},
@@ -230,43 +166,13 @@ if __name__ == "__main__":
 		"top_k": {"do_sample": True, "top_k": 10}
 	}
 
-	with torch.no_grad():
-		model.eval()
+	for curr_strat, strat_kwargs in strategies.items():
+		dev_pred_para = pg_trainer.generate(dev_prompts.tolist(), max_seq_len=args.max_seq_len, strategy=strat_kwargs)
+		with open(os.path.join(args.experiment_dir, f"dev_{curr_strat}_hyp.txt"), "w", encoding="utf-8") as f:
+			for _txt in dev_pred_para:
+				print(re.sub(r"(\n)+", " ", _txt.strip()), file=f)
 
-		for curr_strat, strat_kwargs in strategies.items():
-			num_dev_batches = (len(dev_set) + args.batch_size - 1) // args.batch_size
-
-			pred_para = []
-			for idx_example in tqdm(range(dev_df.shape[0]), total=dev_df.shape[0]):
-				curr_prompt = dev_prompts.iloc[idx_example]
-				curr_encoded = tokenizer.batch_encode_plus([curr_prompt], return_tensors="pt")
-				take_from_idx = len(curr_encoded["input_ids"][0])
-				eff_max_len = len(curr_encoded["input_ids"][0]) + args.max_seq_len
-
-				curr_output = model.generate(curr_encoded["input_ids"].to(DEVICE),
-											 pad_token_id=tokenizer.pad_token_id,
-											 eos_token_id=tokenizer.eos_token_id,
-											 max_length=eff_max_len, **strat_kwargs)
-				pred_para.append(tokenizer.decode(curr_output[0, take_from_idx:].cpu(), skip_special_tokens=True))
-
-			with open(os.path.join(args.experiment_dir, f"dev_{curr_strat}_hyp.txt"), "w", encoding="utf-8") as f:
-				for _txt in pred_para:
-					print(re.sub(r"(\n)+", " ", _txt.strip()), file=f)
-
-			num_test_batches = (len(test_set) + args.batch_size - 1) // args.batch_size
-			test_pred_para = []
-			for idx_example in tqdm(range(test_df.shape[0]), total=test_df.shape[0]):
-				curr_prompt = test_prompts.iloc[idx_example]
-				curr_encoded = tokenizer.batch_encode_plus([curr_prompt], return_tensors="pt")
-				take_from_idx = len(curr_encoded["input_ids"][0])
-				eff_max_len = len(curr_encoded["input_ids"][0]) + args.max_seq_len
-
-				curr_output = model.generate(curr_encoded["input_ids"].to(DEVICE),
-											 pad_token_id=tokenizer.pad_token_id,
-											 eos_token_id=tokenizer.eos_token_id,
-											 max_length=eff_max_len, **strat_kwargs)
-				test_pred_para.append(tokenizer.decode(curr_output[0, take_from_idx:].cpu(), skip_special_tokens=True))
-
-			with open(os.path.join(args.experiment_dir, f"test_{curr_strat}_hyp.txt"), "w", encoding="utf-8") as f:
-				for _txt in test_pred_para:
-					print(re.sub(r"(\n)+", " ", _txt.strip()), file=f)
+		test_pred_para = pg_trainer.generate(test_prompts.tolist(), max_seq_len=args.max_seq_len, strategy=strat_kwargs)
+		with open(os.path.join(args.experiment_dir, f"test_{curr_strat}_hyp.txt"), "w", encoding="utf-8") as f:
+			for _txt in test_pred_para:
+				print(re.sub(r"(\n)+", " ", _txt.strip()), file=f)
