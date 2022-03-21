@@ -8,7 +8,7 @@ import re
 import numpy as np
 import pandas as pd
 import torch
-from transformers import GPT2Tokenizer
+from transformers import AutoTokenizer
 
 from src.data.cleaning import mask_not_na, inds_unique, mask_long_enough
 from src.data.nli import TransformersSeqPairDataset
@@ -59,12 +59,7 @@ if __name__ == "__main__":
 		logging.info(f"|{k:30s}|{v_str:50s}|")
 
 	# No AutoTokenizerFast at the moment?
-	if args.model_type == "gpt2":
-		tokenizer_cls = GPT2Tokenizer
-	else:
-		raise NotImplementedError(f"Model_type '{args.model_type}' is not supported")
-
-	tokenizer = tokenizer_cls.from_pretrained(args.pretrained_name_or_path)
+	tokenizer = AutoTokenizer.from_pretrained(args.pretrained_name_or_path)
 	tokenizer.add_special_tokens({
 		"eos_token": "<EOS>",
 		"pad_token": "<PAD>",
