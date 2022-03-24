@@ -6,3 +6,4 @@ sklearn
 tqdm
 numpy
 matplotlib
+stanza
