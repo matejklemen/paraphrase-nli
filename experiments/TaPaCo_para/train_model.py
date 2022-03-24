@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
-from transformers import BertTokenizerFast, RobertaTokenizerFast, XLMRobertaTokenizerFast, AutoTokenizer
+from transformers import AutoTokenizer
 
 from src.data.paraphrase import TapacoTransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
@@ -22,11 +22,11 @@ parser.add_argument("--reverse_order", action="store_true")
 parser.add_argument("--optimized_metric", default="accuracy",
                     choices=["loss", "accuracy", "binary_f1"])
 
-parser.add_argument("--train_path", type=str, help="Path to training set of MSCOCO (tsv)",
+parser.add_argument("--train_path", type=str, help="Path to training set of TaPaCo (tsv)",
                     default="/home/matej/Documents/paraphrase-nli/experiments/TaPaCo_para/en/id_tapaco_en_train.tsv")
-parser.add_argument("--dev_path", type=str, help="Path to dev set of MSCOCO (tsv)",
+parser.add_argument("--dev_path", type=str, help="Path to dev set of TaPaCo (tsv)",
                     default="/home/matej/Documents/paraphrase-nli/experiments/TaPaCo_para/en/id_tapaco_en_dev.tsv")
-parser.add_argument("--test_path", type=str, help="Path to test set of MSCOCO (tsv)",
+parser.add_argument("--test_path", type=str, help="Path to test set of TaPaCo (tsv)",
                     default="/home/matej/Documents/paraphrase-nli/experiments/TaPaCo_para/en/id_tapaco_en_test.tsv")
 
 parser.add_argument("--num_epochs", type=int, default=2)
