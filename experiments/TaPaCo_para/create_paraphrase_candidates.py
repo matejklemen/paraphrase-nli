@@ -6,6 +6,12 @@ if __name__ == "__main__":
 	LANGS_TO_CONSIDER = ["en"]
 	pairs = []
 
+	# Add a dummy non-paraphrase as the data loader is for paraphrase identification, a BINARY task, so it expects
+	# two unique labels
+	pairs.append(
+		pd.DataFrame({"sentence1": ["Dummy s1"], "sentence2": ["Dummy s2"], "is_paraphrase": [0], "language": ["xy"]})
+	)
+
 	for curr_lang in LANGS_TO_CONSIDER:
 		data = datasets.load_dataset("tapaco", curr_lang)["train"]
 		curr_pairs = {
