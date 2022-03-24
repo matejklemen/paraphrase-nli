@@ -112,7 +112,8 @@ if __name__ == "__main__":
 
     all_false_paras = {
         "sequence1": [],
-        "sequence2": []
+        "sequence2": [],
+        "language": []
     }
 
     t1 = time()
@@ -229,11 +230,12 @@ if __name__ == "__main__":
             logging.info(f"Skipping visualization for dataset '{dataset_name}' as will likely grow too big")
 
         logging.info(f"{len(rev_nonpara_inds)} non-paraphrases found!")
-        false_paras = {"sequence1": [], "sequence2": []}
+        false_paras = {"sequence1": [], "sequence2": [], "language": []}
         for _i in rev_nonpara_inds:
             # Write them in the order in which they first appeared in (in para dataset)
             false_paras["sequence1"].append(dataset.seq2[_i])
             false_paras["sequence2"].append(dataset.seq1[_i])
+            false_paras["language"].append(dataset.lang[_i])
 
         logging.info(f"Writing false paraphrases for dataset '{dataset_name}' ({len(false_paras['sequence1'])} examples)")
         model_metrics[f"false_paraphrases_{dataset_name}"] = len(false_paras['sequence1'])
@@ -242,6 +244,7 @@ if __name__ == "__main__":
 
         all_false_paras["sequence1"].extend(false_paras["sequence1"])
         all_false_paras["sequence2"].extend(false_paras["sequence2"])
+        all_false_paras["language"].extend(false_paras["language"])
 
     t2 = time()
     logging.info(f"Filtering took {t2 - t1: .4f}s")
