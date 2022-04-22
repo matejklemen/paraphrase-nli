@@ -10,7 +10,7 @@ import pandas as pd
 import torch
 from transformers import AutoTokenizer
 
-from src.data.paraphrase import KASTransformersDataset
+from src.data.bitext import KASTransformersDataset
 from src.models.nli_trainer import TransformersNLITrainer
 from src.visualization.visualize import multicolumn_visualization
 
