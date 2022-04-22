@@ -5,24 +5,9 @@ from warnings import warn
 
 import datasets
 import torch
-from torch.utils.data import Dataset
 import pandas as pd
 
-
-class TransformersSeqPairDataset(Dataset):
-    def __init__(self, **kwargs):
-        self.valid_attrs = []
-        self.num_examples = 0
-        for attr, values in kwargs.items():
-            self.valid_attrs.append(attr)
-            setattr(self, attr, values)
-            self.num_examples = len(values)
-
-    def __getitem__(self, item):
-        return {k: getattr(self, k)[item] for k in self.valid_attrs}
-
-    def __len__(self):
-        return self.num_examples
+from src.data import TransformersSeqPairDataset
 
 
 class SNLITransformersDataset(TransformersSeqPairDataset):
