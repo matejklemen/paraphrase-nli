@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import pandas as pd
@@ -81,8 +82,12 @@ class RSDO4TransformersDataset(TransformersSeqPairDataset):
 class WMT14TransformersDataset(TransformersSeqPairDataset):
     def __init__(self, path: str, tokenizer,
                  max_length: Optional[int] = None, return_tensors: Optional[str] = None,
-                 reverse_order: Optional[bool] = False):
-        data = pd.read_csv(path, sep="\t", lineterminator="\n")
+                 reverse_order: Optional[bool] = False,
+                 nrows: Optional[int] = None):
+        if nrows is not None:
+            logging.warning(f"Only using first {nrows} rows...")
+
+        data = pd.read_csv(path, sep="\t", lineterminator="\n", nrows=nrows)
 
         self.seq1 = data["sentence1"].tolist()
         self.seq2 = data["sentence2"].tolist()

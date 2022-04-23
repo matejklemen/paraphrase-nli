@@ -35,6 +35,7 @@ parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--learning_rate", type=float, default=2e-5)
 parser.add_argument("--early_stopping_rounds", type=int, default=5)
 parser.add_argument("--validate_every_n_examples", type=int, default=20_000)
+parser.add_argument("--nrows", type=int, default=None)
 
 parser.add_argument("--use_cpu", action="store_true")
 
@@ -64,7 +65,8 @@ if __name__ == "__main__":
 
     train_set = WMT14TransformersDataset(args.train_path, tokenizer=tokenizer,
                                          max_length=args.max_seq_len, return_tensors="pt",
-                                         reverse_order=args.reverse_order)
+                                         reverse_order=args.reverse_order,
+                                         nrows=args.nrows)
     dev_set = WMT14TransformersDataset(args.dev_path, tokenizer=tokenizer,
                                        max_length=args.max_seq_len, return_tensors="pt",
                                        reverse_order=args.reverse_order)
