@@ -6,6 +6,7 @@ from typing import Optional
 
 import torch
 import torch.optim as optim
+from datasets import IterableDataset
 from sklearn.metrics import f1_score
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import Subset, DataLoader
@@ -135,7 +136,13 @@ class TransformersNLITrainer:
         else:
             self.model.eval()
 
-        num_batches = (len(val_dataset) + self.batch_size - 1) // self.batch_size
+        if isinstance(val_dataset, IterableDataset):
+            # length of an iterable dataset is hard to determine in a general manner
+            num_batches = None
+        else:
+            num_batches = (len(val_dataset) + self.batch_size - 1) // self.batch_size
+
+        running_num_batches = 0
         eval_loss = 0.0
         compute_loss = hasattr(val_dataset, "labels")
 
@@ -145,6 +152,7 @@ class TransformersNLITrainer:
         }
         for curr_batch in tqdm(DataLoader(val_dataset, shuffle=False, batch_size=self.batch_size),
                                total=num_batches):
+            running_num_batches += 1
             res = self.model(**{k: v.to(self.device) for k, v in curr_batch.items()})
             if compute_loss:
                 eval_loss += float(res["loss"])
@@ -158,7 +166,7 @@ class TransformersNLITrainer:
         results["pred_label"] = torch.cat(results["pred_label"])
         results["pred_proba"] = torch.cat(results["pred_proba"])
         if compute_loss:
-            results["eval_loss"] = eval_loss / max(num_batches, 1)
+            results["eval_loss"] = eval_loss / max(running_num_batches, 1)
         return results
 
     def run(self, train_dataset, val_dataset, num_epochs):
