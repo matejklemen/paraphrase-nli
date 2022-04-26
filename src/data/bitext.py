@@ -3,7 +3,6 @@ from typing import Optional
 
 import pandas as pd
 import torch
-from torch.utils.data import IterableDataset
 
 from src.data.nli import TransformersSeqPairDataset
 
@@ -11,9 +10,12 @@ from src.data.nli import TransformersSeqPairDataset
 class KASTransformersDataset(TransformersSeqPairDataset):
     def __init__(self, path: str, tokenizer,
                  max_length: Optional[int] = None, return_tensors: Optional[str] = None,
-                 reverse_order: Optional[bool] = False):
-        data = pd.read_csv(path, sep="\t")
+                 reverse_order: Optional[bool] = False,
+                 nrows: Optional[int] = None):
+        if nrows is not None:
+            logging.warning(f"Only using first {nrows} rows...")
 
+        data = pd.read_csv(path, sep="\t", nrows=nrows)
         self.seq1 = data["sentence1"].tolist()
         self.seq2 = data["sentence2"].tolist()
         valid_label = data["is_translation"].tolist()
@@ -118,3 +120,6 @@ class WMT14TransformersDataset(TransformersSeqPairDataset):
         encoded["labels"] = valid_label
 
         super().__init__(**encoded)
+
+
+CCMatrixTransformersDataset = KASTransformersDataset  # identical logic, rename for clarity
