@@ -13,9 +13,9 @@ class KASTransformersDataset(TransformersSeqPairDataset):
                  reverse_order: Optional[bool] = False,
                  nrows: Optional[int] = None):
         if nrows is not None:
-            logging.warning(f"Only using first {nrows} rows...")
+            logging.warning(f"Only using {nrows} random rows...")
 
-        data = pd.read_csv(path, sep="\t", nrows=nrows)
+        data = pd.read_csv(path, sep="\t").sample(n=nrows)
         self.seq1 = data["sentence1"].tolist()
         self.seq2 = data["sentence2"].tolist()
         valid_label = data["is_translation"].tolist()
@@ -49,8 +49,12 @@ class KASTransformersDataset(TransformersSeqPairDataset):
 class RSDO4TransformersDataset(TransformersSeqPairDataset):
     def __init__(self, path: str, tokenizer,
                  max_length: Optional[int] = None, return_tensors: Optional[str] = None,
-                 reverse_order: Optional[bool] = False):
-        data = pd.read_csv(path, sep="\t", keep_default_na=False)
+                 reverse_order: Optional[bool] = False,
+                 nrows: Optional[int] = None):
+        if nrows is not None:
+            logging.warning(f"Only using {nrows} random rows...")
+
+        data = pd.read_csv(path, sep="\t", keep_default_na=False).sample(n=nrows)
 
         self.seq1 = data["sentence1"].tolist()
         self.seq2 = data["sentence2"].tolist()
@@ -88,9 +92,9 @@ class WMT14TransformersDataset(TransformersSeqPairDataset):
                  reverse_order: Optional[bool] = False,
                  nrows: Optional[int] = None):
         if nrows is not None:
-            logging.warning(f"Only using first {nrows} rows...")
+            logging.warning(f"Only using {nrows} random rows...")
 
-        data = pd.read_csv(path, sep="\t", lineterminator="\n", nrows=nrows)
+        data = pd.read_csv(path, sep="\t", lineterminator="\n").sample(n=nrows)
 
         self.seq1 = data["sentence1"].tolist()
         self.seq2 = data["sentence2"].tolist()
