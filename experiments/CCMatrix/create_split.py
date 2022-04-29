@@ -1,3 +1,4 @@
+import argparse
 from copy import deepcopy
 
 import numpy as np
@@ -5,8 +6,14 @@ import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--lang1", type=str, default="nl")
+parser.add_argument("--lang2", type=str, default="sl")
+
 if __name__ == "__main__":
-	LANG1, LANG2 = "nl", "sl"
+	args = parser.parse_args()
+
+	LANG1, LANG2 = args.lang1, args.lang2
 	data = load_dataset("yhavinga/ccmatrix", lang1=LANG1, lang2=LANG2)["train"]
 
 	train_examples = {
