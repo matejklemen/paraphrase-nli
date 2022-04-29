@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -13,6 +14,7 @@ class KASTransformersDataset(TransformersSeqPairDataset):
                  reverse_order: Optional[bool] = False,
                  nrows: Optional[int] = None):
         data = pd.read_csv(path, sep="\t")
+        data = data.loc[np.logical_not(np.logical_or(data["sentence1"].isna(), data["sentence2"].isna()))]
         if nrows is not None:
             logging.warning(f"Only using {nrows} random rows...")
             data = data.sample(n=nrows)
@@ -53,6 +55,7 @@ class RSDO4TransformersDataset(TransformersSeqPairDataset):
                  reverse_order: Optional[bool] = False,
                  nrows: Optional[int] = None):
         data = pd.read_csv(path, sep="\t", keep_default_na=False)
+        data = data.loc[np.logical_not(np.logical_or(data["sentence1"].isna(), data["sentence2"].isna()))]
         if nrows is not None:
             logging.warning(f"Only using {nrows} random rows...")
             data = data.sample(n=nrows)
@@ -93,6 +96,7 @@ class WMT14TransformersDataset(TransformersSeqPairDataset):
                  reverse_order: Optional[bool] = False,
                  nrows: Optional[int] = None):
         data = pd.read_csv(path, sep="\t", lineterminator="\n")
+        data = data.loc[np.logical_not(np.logical_or(data["sentence1"].isna(), data["sentence2"].isna()))]
         if nrows is not None:
             logging.warning(f"Only using {nrows} random rows...")
             data = data.sample(n=nrows)
