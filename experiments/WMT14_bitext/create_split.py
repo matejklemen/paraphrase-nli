@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
 	train_examples.to_csv(f"id_wmt14_{LANG_PAIR}_bitext_train_mixeddir.tsv", sep="\t", index=False)
 	dev_examples.to_csv(f"id_wmt14_{LANG_PAIR}_bitext_dev_mixeddir.tsv", sep="\t", index=False)
-	dev_examples.to_csv(f"id_wmt14_{LANG_PAIR}_bitext_test_mixeddir.tsv", sep="\t", index=False)
+	test_examples.to_csv(f"id_wmt14_{LANG_PAIR}_bitext_test_mixeddir.tsv", sep="\t", index=False)
 
 
 
