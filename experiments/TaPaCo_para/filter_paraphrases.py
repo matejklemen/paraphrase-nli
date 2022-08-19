@@ -255,5 +255,13 @@ if __name__ == "__main__":
         json.dump(model_metrics, fp=f_metrics, indent=4)
 
     logging.info(f"Writing combined false paraphrases ({len(all_false_paras['sequence1'])} examples)")
-    pd.DataFrame(all_false_paras).to_csv(os.path.join(args.experiment_dir, f"all_false_paraphrases.csv"),
-                                         sep=",", index=False, quoting=csv.QUOTE_ALL)
+    all_false_paras = pd.DataFrame(all_false_paras)
+    all_false_paras.to_csv(os.path.join(args.experiment_dir, f"all_false_paraphrases.csv"),
+                           sep=",", index=False, quoting=csv.QUOTE_ALL)
+
+    if not os.path.exists(os.path.join(args.experiment_dir, "by_language")):
+        os.makedirs(os.path.join(args.experiment_dir, "by_language"))
+
+    for curr_lang, curr_group in all_false_paras.groupby("language"):
+        curr_group.to_csv(os.path.join(args.experiment_dir, "by_language", f"{curr_lang}_false_paraphrases.csv"),
+                          sep=",", index=False, quoting=csv.QUOTE_ALL)
